@@ -1,0 +1,11 @@
+# Compiled Java class files
+*.class
+bin/
+# IDE files
+.vscode/
+.idea/
+*.iml
+# OS‑specific files
+Thumbs.db
+Desktop.ini
+.DS_Store
