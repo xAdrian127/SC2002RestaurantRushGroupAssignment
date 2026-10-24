@@ -77,4 +77,21 @@ public class Order {
     public void setTurnReadyToPay(int turnReadyToPay) {
         this.turnReadyToPay = turnReadyToPay;
     }
+    
+    public void advancePreparation() {
+    	if (!isReady && prepUnitsLeft>0) {
+    		prepUnitsLeft--;
+    		if (prepUnitsLeft==0) {
+    			isReady = true;
+    		}
+    	}
+    }
+    
+    public void serve(int turn) {
+    	if(isReady && !isServed) {
+    		isServed = true;
+    		turnServed = turn;
+    	}
+    }
+    
 }
