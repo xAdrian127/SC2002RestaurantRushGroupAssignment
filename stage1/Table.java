@@ -26,4 +26,10 @@ public class Table {
     public void clearTable() {
         this.occupiedBy = null;
     }
+    
+    public void seat(Customer customer) {
+    	if (!isOccupied() && customer!=null) {
+    		occupiedBy = customer;
+    	}
+    }
 }

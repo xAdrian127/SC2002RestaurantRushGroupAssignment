@@ -9,6 +9,9 @@ public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         Random random = new Random();
+        
+        Waiter waiter = new Waiter();
+        Chef chef = new Chef();
 
         // --- Stage 1 Base Setting (Section 2.1) ---
         List<Customer> waitingQueue = new ArrayList<>();
@@ -89,7 +92,7 @@ public class Main {
                                 "[INVALID] Queue is empty, no customer to seat! Please choose another action.");
                     } else {
                         Customer seatedCust = waitingQueue.remove(0);
-                        tables[tableIdx].setOccupiedBy(seatedCust);
+                        waiter.seat(seatedCust, tables[tableIdx]);
                         isWaiterBusy = true;
                         System.out.println(
                                 "[ACTION] Waiter seated " + seatedCust.getName() + " at Table " + (tableIdx + 1));
@@ -114,8 +117,8 @@ public class Main {
                         Customer c = tables[tNum].getOccupiedBy();
                         // Customer chooses their own food from the menu
                         int customerFoodChoice = random.nextInt(3) + 1;
-                        Order newOrder = createOrderFromChoice(customerFoodChoice);
-                        c.setOrder(newOrder);
+                        MenuItem selectedFood = Menu.Choice(customerFoodChoice);
+                        Order newOrder = waiter.takeOrder(c, selectedFood);
                         isWaiterBusy = true;
                         System.out.println("[ACTION] Took order: " + c.getName() + " chose " + newOrder.getFoodName()
                                 + " ($" + String.format("%.2f", newOrder.getPrice()) + ", "
@@ -146,8 +149,7 @@ public class Main {
                         } else if (ord.isServed()) {
                             System.out.println("[INVALID] Food has already been served to Table " + (tNum + 1) + "!");
                         } else {
-                            ord.setServed(true);
-                            ord.setTurnServed(turn);
+                            waiter.serve(ord, turn);
                             servedCustomerCount++;
                             isWaiterBusy = true;
                             System.out.println("[ACTION] Waiter served " + ord.getFoodName() + " to " + c.getName()
@@ -202,7 +204,7 @@ public class Main {
                         int chosenTableIdx = cookableTables.get(chefChoice - 1);
                         Customer c = tables[chosenTableIdx].getOccupiedBy();
                         Order ord = c.getOrder();
-                        ord.setPrepUnitsLeft(ord.getPrepUnitsLeft() - 1);
+                        chef.prepare(ord);
                         isChefWorking = true;
                         System.out.println("[CHEF] Cooked 1 unit for " + c.getName() + "'s " + ord.getFoodName()
                                 + " (" + ord.getPrepUnitsLeft() + " prep unit(s) left)");
@@ -366,18 +368,7 @@ public class Main {
         }
     }
 
-    private static Order createOrderFromChoice(int choice) {
-        switch (choice) {
-            case 1:
-                return new Order("Salad", 9.0, 1);
-            case 2:
-                return new Order("Burger", 15.0, 1);
-            case 3:
-                return new Order("Pasta", 18.0, 2);
-            default:
-                return null;
-        }
-    }
+    
 
     // Helper method to print queue
     private static String getQueueNames(List<Customer> queue) {
