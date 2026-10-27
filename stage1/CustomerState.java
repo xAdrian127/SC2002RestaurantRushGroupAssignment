@@ -1,0 +1,3 @@
+public enum CustomerState {
+    QUEUED, SEATED, ORDERED, SERVED, EATING, READY_TO_PAY, PAID, LEFT_UNHAPPY
+}
