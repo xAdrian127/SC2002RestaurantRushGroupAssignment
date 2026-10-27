@@ -1,41 +1,41 @@
 public class Order {
-    private String foodName;
-    private double price;
+    private final MenuItem menuItem;
     private int prepUnitsLeft;
     private boolean isReady;
     private boolean isServed;
-    private int turnServed = -1;
-    private boolean readyToPay = false;
-    private int turnReadyToPay = -1;
 
-    public Order(String foodName, double price, int prepUnits) {
-        this.foodName = foodName;
-        this.price = price;
-        this.prepUnitsLeft = prepUnits;
-        this.isReady = (prepUnits == 0);
+    public Order(MenuItem menuItem) {
+        if (menuItem == null) {
+            throw new IllegalArgumentException("MenuItem cannot be null for an Order");
+        }
+        this.menuItem = menuItem;
+        this.prepUnitsLeft = menuItem.getPreparationUnits();
+        this.isReady = (this.prepUnitsLeft <= 0);
         this.isServed = false;
-        this.turnServed = -1;
-        this.readyToPay = false;
-        this.turnReadyToPay = -1;
+    }
+
+    public Order(int choice) {
+        this(Menu.Choice(choice));
+    }
+
+    public MenuItem getMenuItem() {
+        return menuItem;
     }
 
     public String getFoodName() {
-        return foodName;
+        return menuItem.getName();
     }
 
     public double getPrice() {
-        return price;
+        return menuItem.getPriceCents() / 100.0;
+    }
+
+    public int getPriceCents() {
+        return menuItem.getPriceCents();
     }
 
     public int getPrepUnitsLeft() {
-        return prepUnitsLeft;
-    }
-
-    public void setPrepUnitsLeft(int prepUnitsLeft) {
-        this.prepUnitsLeft = prepUnitsLeft;
-        if (this.prepUnitsLeft <= 0) {
-            this.isReady = true;
-        }
+        return this.prepUnitsLeft;
     }
 
     public boolean isReady() {
@@ -54,45 +54,18 @@ public class Order {
         this.isServed = served;
     }
 
-    public int getTurnServed() {
-        return turnServed;
-    }
-
-    public void setTurnServed(int turnServed) {
-        this.turnServed = turnServed;
-    }
-
-    public boolean isReadyToPay() {
-        return readyToPay;
-    }
-
-    public void setReadyToPay(boolean readyToPay) {
-        this.readyToPay = readyToPay;
-    }
-
-    public int getTurnReadyToPay() {
-        return turnReadyToPay;
-    }
-
-    public void setTurnReadyToPay(int turnReadyToPay) {
-        this.turnReadyToPay = turnReadyToPay;
-    }
-    
     public void advancePreparation() {
-    	if (!isReady && prepUnitsLeft>0) {
-    		prepUnitsLeft--;
-    		if (prepUnitsLeft==0) {
-    			isReady = true;
-    		}
-    	}
+        if (!isReady && prepUnitsLeft > 0) {
+            prepUnitsLeft--;
+            if (prepUnitsLeft == 0) {
+                isReady = true;
+            }
+        }
     }
-    
-    public void serve(int turn) {
-    	if(isReady && !isServed) {
-    		isServed = true;
-    		turnServed = turn;
-    	}
+
+    public void serve() {
+        if (isReady && !isServed) {
+            isServed = true;
+        }
     }
-    
-    
 }

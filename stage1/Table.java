@@ -1,35 +1,43 @@
 public class Table {
     private int tableNumber;
-    private Customer occupiedBy;
+    private Customer seatedCustomer;
 
     public Table(int tableNumber) {
         this.tableNumber = tableNumber;
-        this.occupiedBy = null;
+        this.seatedCustomer = null;
     }
 
+    public void seat(Customer customer) {
+        this.seatedCustomer = customer;
+    }
+
+    public boolean isOccupied() {
+        return seatedCustomer != null;
+    }
+
+    public void clearTable() {
+        this.seatedCustomer = null;
+    }
+
+    // getters and setters
     public int getTableNumber() {
         return tableNumber;
     }
 
+    public Customer getseatedCustomer() {
+        return seatedCustomer;
+    }
+
+    public void setseatedCustomer(Customer customer) {
+        this.seatedCustomer = customer;
+    }
+
+    // Aliases for convenience across controllers/view
     public Customer getOccupiedBy() {
-        return occupiedBy;
+        return seatedCustomer;
     }
 
     public void setOccupiedBy(Customer customer) {
-        this.occupiedBy = customer;
-    }
-
-    public boolean isOccupied() {
-        return occupiedBy != null;
-    }
-
-    public void clearTable() {
-        this.occupiedBy = null;
-    }
-    
-    public void seat(Customer customer) {
-    	if (!isOccupied() && customer!=null) {
-    		occupiedBy = customer;
-    	}
+        this.seatedCustomer = customer;
     }
 }
