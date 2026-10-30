@@ -54,9 +54,25 @@ public class RestaurantController {
                 customerName = "Cust_" + (nameIndex + 1);
                 nameIndex++;
             }
-            Customer newCustomer = new Customer(customerName);
+            // Cycle through Regular, VIP, and Critic customers.
+            // Arrival turns are 1, 4, 7, 10, 13, and 16.
+            int customerTypeIndex = (turn_num - 1) / 3;
+            Customer newCustomer;
+            switch (customerTypeIndex % 3) {
+                case 1:
+                    newCustomer = new VIPCustomer(customerName);
+                    break;
+                case 2:
+                    newCustomer = new CriticCustomer(customerName);
+                    break;
+                default:
+                    newCustomer = new RegularCustomer(customerName);
+                    break;
+            }
             waitingQueue.add(newCustomer);
-            System.out.println("[ARRIVAL] " + newCustomer.getName() + " entered the queue (Satisfaction: 100).");
+            System.out.println("[ARRIVAL] " + newCustomer.getName() + " ("
+                    + newCustomer.getClass().getSimpleName()
+                    + ") entered the queue (Satisfaction: 100).");
         }
 
         // 2. Automatic State Progression: 1 turn after SERVED, transition to READY_TO_PAY
@@ -152,11 +168,15 @@ public class RestaurantController {
             if (tables[i].isOccupied()) {
                 Customer c = tables[i].getseatedCustomer();
                 if (c.getState() == CustomerState.READY_TO_PAY && i != tableBecameReadyThisTurn) {
-                    totalRevenue += c.getOrder().getPrice();
+                    double bill = c.getOrder().getPrice();
+                    if (c instanceof VIPCustomer) {
+                        bill *= 0.90; // VIP customers receive a 10% discount.
+                    }
+                    totalRevenue += bill;
                     paidCustomerCount++;
                     totalSatisfactionOfPaidCustomer += c.getSatisfaction();
                     c.setState(CustomerState.PAID);
-                    System.out.println("[CASHIER] " + c.getName() + " paid $" + String.format("%.2f", c.getOrder().getPrice())
+                    System.out.println("[CASHIER] " + c.getName() + " paid $" + String.format("%.2f", bill)
                             + " (Recorded Satisfaction: " + c.getSatisfaction() + ") and left Table " + (i + 1));
                     tables[i].clearTable(); // Free table cleanly
                     break; // At most one payment handled per turn
