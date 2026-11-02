@@ -112,9 +112,9 @@ Or execute the automated batch file:
 
 ### A. Reproducible Victory Run (Passed All 3 Criteria)
 **Objective targets met at Turn 18**:
-- Paid Customers: **4** (Target $\ge 4$) $\rightarrow$ **PASSED**
-- Total Revenue: **$55.50** (Target $\ge \$45.00$) $\rightarrow$ **PASSED** (Alice $15.00 + Bob $13.50 + Charlie $18.00 + David $9.00)
-- Average Paid Satisfaction: **78.5** (Target $\ge 60.0$) $\rightarrow$ **PASSED**
+- Paid Customers: **4** (Target >= 4) -> **PASSED**
+- Total Revenue: **$55.50** (Target >= $45.00) -> **PASSED** (Alice $15.00 + Bob $13.50 + Charlie $18.00 + David $9.00)
+- Average Paid Satisfaction: **78.5** (Target >= 60.0) -> **PASSED**
 - Result: **VICTORY!**
 
 **Turn-by-turn Manager Input Sequence**:
@@ -148,9 +148,9 @@ Or execute the automated batch file:
 
 ### B. Reproducible Defeat Run (Customer Abandonment)
 **Objective targets evaluated at Turn 18**:
-- Paid Customers: **0** (Target $\ge 4$) $\rightarrow$ **FAILED**
-- Total Revenue: **$0.00** (Target $\ge \$45.00$) $\rightarrow$ **FAILED**
-- Average Paid Satisfaction: **N/A** $\rightarrow$ **FAILED**
+- Paid Customers: **0** (Target >= 4) -> **FAILED**
+- Total Revenue: **$0.00** (Target >= $45.00) -> **FAILED**
+- Average Paid Satisfaction: **N/A** (Target >= 60.0) -> **FAILED**
 - Result: **DEFEAT!**
 
 **Execution**: The manager enters `4` (Waiter wait) and `1` (Chef wait) across all 18 turns. Waiting customers undergo satisfaction decay until reaching 0 and abandon the queue without paying.
