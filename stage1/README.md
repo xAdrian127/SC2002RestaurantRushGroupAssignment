@@ -116,12 +116,18 @@ flowchart TD
 
 ## 6. Build & Execution
 
-To compile and run Stage 1:
+To compile and run Stage 1 via command line:
 
 ```powershell
 cd stage1
 javac *.java
 java Main
+```
+
+Or execute the automated batch file:
+
+```powershell
+.\run.bat
 ```
 
 ---
