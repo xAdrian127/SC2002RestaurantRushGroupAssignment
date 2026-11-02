@@ -1,3 +1,9 @@
+package entity.staff;
+
+import entity.Order;
+import entity.Table;
+import entity.customer.Customer;
+
 public class Chef {
     private boolean actedThisTurn = false;
 
@@ -45,7 +51,6 @@ public class Chef {
         return true;
     }
 
-    // Direct helper method if cooking an order directly
     public void prepare(Order order) {
         if (order != null) {
             order.advancePreparation();
@@ -53,3 +58,4 @@ public class Chef {
         }
     }
 }
+

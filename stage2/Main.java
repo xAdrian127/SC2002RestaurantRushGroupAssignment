@@ -1,14 +1,16 @@
+import control.RestaurantController;
+import entity.Order;
+import entity.Table;
+import entity.customer.Customer;
+import entity.customer.CustomerState;
 
-// Main.java (Stage 1 - View & CLI Driver using RestaurantController)
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        Random random = new Random();
 
         RestaurantController controller = new RestaurantController();
 
@@ -19,7 +21,7 @@ public class Main {
         // --- 18-Turn Main Game Loop (Always runs all 18 turns) ---
         for (int turn = 1; turn <= 18; turn++) {
             // Step 1: Process Arrivals & Start of Turn Header
-            controller.proccessTurnStart(turn);
+            controller.processTurnStart(turn);
 
             // Display current queue & table status
             System.out.println("Waiting Queue (" + controller.getWaitingQueue().size() + "): "
@@ -66,9 +68,8 @@ public class Main {
                         continue;
                     }
                     int tableIdx = tInput - 1;
-                    // Customer chooses their own food randomly from the menu
-                    int customerFoodChoice = random.nextInt(Menu.getItemCount()) + 1;
-                    if (controller.takeOrder(tableIdx, customerFoodChoice)) {
+                    // Customer chooses their own food according to domain object rules
+                    if (controller.takeOrder(tableIdx)) {
                         waiterActionDone = true;
                     }
                 } else if (choice == 3) {
@@ -99,84 +100,114 @@ public class Main {
             List<Integer> cookableTables = new ArrayList<>();
             for (int i = 0; i < currentTables.length; i++) {
                 if (currentTables[i].isOccupied()) {
-                    Customer c = currentTables[i].getseatedCustomer();
-                    if (c.getOrder() != null && !c.getOrder().isReady()) {
+                    Order o = currentTables[i].getseatedCustomer().getOrder();
+                    if (o != null && !o.isReady()) {
                         cookableTables.add(i);
                     }
                 }
             }
 
-            if (cookableTables.isEmpty()) {
-                controller.chefWait();
-                System.out.println("\n[CHEF ACTION] No orders currently need cooking. Chef is waiting.");
-            } else {
-                boolean chefActionDone = false;
-                while (!chefActionDone) {
-                    System.out.println("\n[CHEF ACTION] Select Chef Task for Turn " + turn + ":");
-                    for (int k = 0; k < cookableTables.size(); k++) {
-                        int tIdx = cookableTables.get(k);
-                        Order ord = currentTables[tIdx].getseatedCustomer().getOrder();
-                        System.out.println((k + 1) + ". Cook for Table " + (tIdx + 1) + " (" + ord.getFoodName()
-                                + ", " + ord.getPrepUnitsLeft() + " prep unit(s) left)");
-                    }
-                    int waitOption = cookableTables.size() + 1;
-                    System.out.println(waitOption + ". Do Nothing / Wait");
+            boolean chefActionDone = false;
+            while (!chefActionDone) {
+                System.out.println("\n[CHEF ACTION] Select Chef Task for Turn " + turn + ":");
+                if (cookableTables.isEmpty()) {
+                    System.out.println("No pending orders need cooking. Chef must wait.");
+                    System.out.println("1. Do Nothing / Wait");
                     System.out.print("Chef Choice > ");
-
-                    int chefChoice = getSafeIntInput(scanner);
-                    if (chefChoice == -1) {
+                    int cChoice = getSafeIntInput(scanner);
+                    if (cChoice == -1) {
                         return;
                     }
-
-                    if (chefChoice >= 1 && chefChoice <= cookableTables.size()) {
-                        int chosenTableIdx = cookableTables.get(chefChoice - 1);
-                        if (controller.cookDish(chosenTableIdx)) {
-                            chefActionDone = true;
-                        }
-                    } else if (chefChoice == waitOption) {
+                    if (cChoice == 1) {
                         controller.chefWait();
-                        System.out.println("[CHEF] Chef remained idle / waited this turn.");
+                        System.out.println("[ACTION] Chef waited this turn.");
                         chefActionDone = true;
                     } else {
-                        System.out.println(
-                                "[INVALID] Choice must be between 1 and " + waitOption + ". Please try again.");
+                        System.out.println("[INVALID] Only option 1 is available.");
+                    }
+                } else if (cookableTables.size() == 1) {
+                    int targetTableIdx = cookableTables.get(0);
+                    Table targetTable = currentTables[targetTableIdx];
+                    Order o = targetTable.getseatedCustomer().getOrder();
+                    System.out.println("1. Cook order for Table " + targetTable.getTableNumber()
+                            + " (" + o.getFoodName() + ", " + o.getPrepUnitsLeft() + " prep unit(s) left)");
+                    System.out.println("2. Do Nothing / Wait");
+                    System.out.print("Chef Choice > ");
+                    int cChoice = getSafeIntInput(scanner);
+                    if (cChoice == -1) {
+                        return;
+                    }
+                    if (cChoice == 1) {
+                        if (controller.cookDish(targetTableIdx)) {
+                            chefActionDone = true;
+                        }
+                    } else if (cChoice == 2) {
+                        controller.chefWait();
+                        System.out.println("[ACTION] Chef waited this turn.");
+                        chefActionDone = true;
+                    } else {
+                        System.out.println("[INVALID] Choice must be 1 or 2.");
+                    }
+                } else {
+                    // Two pending orders
+                    int tIdx1 = cookableTables.get(0);
+                    int tIdx2 = cookableTables.get(1);
+                    Order o1 = currentTables[tIdx1].getseatedCustomer().getOrder();
+                    Order o2 = currentTables[tIdx2].getseatedCustomer().getOrder();
+
+                    System.out.println("1. Cook order for Table " + currentTables[tIdx1].getTableNumber()
+                            + " (" + o1.getFoodName() + ", " + o1.getPrepUnitsLeft() + " prep unit(s) left)");
+                    System.out.println("2. Cook order for Table " + currentTables[tIdx2].getTableNumber()
+                            + " (" + o2.getFoodName() + ", " + o2.getPrepUnitsLeft() + " prep unit(s) left)");
+                    System.out.println("3. Do Nothing / Wait");
+                    System.out.print("Chef Choice > ");
+                    int cChoice = getSafeIntInput(scanner);
+                    if (cChoice == -1) {
+                        return;
+                    }
+                    if (cChoice == 1) {
+                        if (controller.cookDish(tIdx1)) {
+                            chefActionDone = true;
+                        }
+                    } else if (cChoice == 2) {
+                        if (controller.cookDish(tIdx2)) {
+                            chefActionDone = true;
+                        }
+                    } else if (cChoice == 3) {
+                        controller.chefWait();
+                        System.out.println("[ACTION] Chef waited this turn.");
+                        chefActionDone = true;
+                    } else {
+                        System.out.println("[INVALID] Choice must be 1, 2, or 3.");
                     }
                 }
             }
 
             // ----------------------------------------------------
-            // STEP 4 & 5: Eating, Cashier Payments & Satisfaction Decay
+            // Step 3-5: Turn End (Decay & Abandonment)
             // ----------------------------------------------------
             controller.processTurnEnd();
 
-            // ----------------------------------------------------
-            // END OF TURN SUMMARY
-            // ----------------------------------------------------
-            System.out.println("\n------------------------------------------");
-            System.out.println("=== END OF TURN " + turn + " SUMMARY ===");
-            System.out.println("Turns Used                 : " + turn + " / 18");
+            // End of Turn summary
+            System.out.println("\n--- End of Turn " + turn + " Summary ---");
             System.out.println("Served Count               : " + controller.getServedCustomerCount());
-            System.out.println("Paid Customers             : " + controller.getPaidCustomerCount());
             System.out.println("Unhappy Departures         : " + controller.getUnhappyDepartures());
             System.out.println("Revenue                    : $" + String.format("%.2f", controller.getTotalRevenue()));
+            System.out.println("Paid Customers             : " + controller.getPaidCustomerCount());
             System.out.println("Average Paid Satisfaction  : " + controller.getAverageSatisfactionString());
-            System.out.println("------------------------------------------");
-            printTableStatus(controller.getTables());
-        } // End of 18 turns
+            System.out.println("Turns Used                 : " + turn + " / 18");
+        }
 
-        // ----------------------------------------------------
-        // FINAL GAME SUMMARY & VICTORY EVALUATION (Section 2.1)
-        // ----------------------------------------------------
-
+        // --- Step 6: End Game Evaluation ---
         printEndGame(controller);
         scanner.close();
     }
 
-    // Helper method to safely read integers without crashing on non-numeric input
+    // Safe input helper handling non-numeric tokens
     private static int getSafeIntInput(Scanner scanner) {
         while (true) {
             if (!scanner.hasNext()) {
-                return -1; // End of stream
+                return -1;
             }
             if (scanner.hasNextInt()) {
                 return scanner.nextInt();
@@ -193,7 +224,8 @@ public class Main {
         }
         StringBuilder sb = new StringBuilder();
         for (Customer c : queue) {
-            sb.append(c.getName()).append("(Sat:").append(c.getSatisfaction()).append(") ");
+            sb.append(c.getName()).append("(").append(c.getClass().getSimpleName())
+                    .append(", Sat:").append(c.getSatisfaction()).append(") ");
         }
         return sb.toString();
     }
@@ -218,8 +250,8 @@ public class Main {
                 } else {
                     orderInfo = o.getFoodName() + " (PrepLeft: " + o.getPrepUnitsLeft() + ")";
                 }
-                System.out.println("Table " + (i + 1) + ": [" + c.getName() + " | Sat: " +
-                        c.getSatisfaction() + " | Order: " + orderInfo + "]");
+                System.out.println("Table " + (i + 1) + ": [" + c.getName() + " (" + c.getClass().getSimpleName()
+                        + ") | Sat: " + c.getSatisfaction() + " | Order: " + orderInfo + "]");
             }
         }
     }

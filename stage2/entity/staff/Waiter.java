@@ -1,3 +1,10 @@
+package entity.staff;
+
+import entity.Order;
+import entity.Table;
+import entity.customer.Customer;
+import entity.customer.CustomerState;
+
 public class Waiter {
     private boolean actedThisTurn = false;
 
@@ -35,8 +42,36 @@ public class Waiter {
         table.seat(customer);
         customer.setState(CustomerState.SEATED);
         this.actedThisTurn = true;
-        System.out.println("[ACTION] Waiter seated " + customer.getName() + " at Table " + table.getTableNumber());
+        System.out.println("[ACTION] Waiter seated " + customer.getName() + " ("
+                + customer.getClass().getSimpleName() + ") at Table " + table.getTableNumber());
         return true;
+    }
+
+    /**
+     * Takes order at a table where the seated customer selects food according to their own preference.
+     * Keeps game rules in the domain model rather than the UI.
+     */
+    public boolean takeOrder(Table table) {
+        if (actedThisTurn) {
+            System.out.println("[DENIED] Waiter has already taken an action this turn.");
+            return false;
+        }
+        if (table == null) {
+            System.out.println("[DENIED] Invalid table.");
+            return false;
+        }
+        if (!table.isOccupied()) {
+            System.out.println("[DENIED] Table " + table.getTableNumber() + " is empty! Seat a customer first.");
+            return false;
+        }
+        Customer customer = table.getseatedCustomer();
+        if (customer.getOrder() != null) {
+            System.out.println("[DENIED] Customer at Table " + table.getTableNumber() + " already ordered.");
+            return false;
+        }
+
+        int choice = customer.chooseMenuChoice();
+        return takeOrder(table, choice);
     }
 
     public boolean takeOrder(Table table, int menuChoice) {
@@ -62,7 +97,8 @@ public class Waiter {
         customer.setOrder(order);
         customer.setState(CustomerState.ORDERED);
         this.actedThisTurn = true;
-        System.out.println("[ACTION] Took order: " + customer.getName() + " chose " + order.getFoodName()
+        System.out.println("[ACTION] Took order: " + customer.getName() + " ("
+                + customer.getClass().getSimpleName() + ") chose " + order.getFoodName()
                 + " ($" + String.format("%.2f", order.getPrice()) + ", " + order.getPrepUnitsLeft()
                 + " prep unit(s)) at Table " + table.getTableNumber());
         return true;
@@ -100,7 +136,8 @@ public class Waiter {
         customer.setState(CustomerState.SERVED);
         this.actedThisTurn = true;
         System.out.println("[ACTION] Waiter served " + order.getFoodName() + " to " + customer.getName()
-                + " at Table " + table.getTableNumber());
+                + " (" + customer.getClass().getSimpleName() + ") at Table " + table.getTableNumber());
         return true;
     }
 }
+

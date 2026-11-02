@@ -1,3 +1,5 @@
+package entity;
+
 public class Menu {
     private static final MenuItem[] Items = {
             new MenuItem("Salad", 900, 1),
@@ -20,3 +22,4 @@ public class Menu {
         return Items;
     }
 }
+

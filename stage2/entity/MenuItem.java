@@ -1,3 +1,5 @@
+package entity;
+
 public class MenuItem {
     private final String name;
     private final int priceCents;
@@ -26,3 +28,4 @@ public class MenuItem {
         return preparationUnits;
     }
 }
+

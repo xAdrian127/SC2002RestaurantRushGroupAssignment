@@ -1,3 +1,5 @@
+package entity.customer;
+
 public enum CustomerState {
     QUEUED,
     SEATED,
@@ -7,3 +9,4 @@ public enum CustomerState {
     PAID,
     LEFT_UNHAPPY
 }
+

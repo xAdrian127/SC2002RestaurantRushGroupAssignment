@@ -1,3 +1,7 @@
+package entity;
+
+import entity.customer.Customer;
+
 public class Table {
     private int tableNumber;
     private Customer seatedCustomer;
@@ -41,3 +45,4 @@ public class Table {
         this.seatedCustomer = customer;
     }
 }
+

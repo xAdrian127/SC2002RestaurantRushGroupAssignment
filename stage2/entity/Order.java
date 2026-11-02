@@ -1,8 +1,11 @@
+package entity;
+
 public class Order {
     private final MenuItem menuItem;
     private int prepUnitsLeft;
     private boolean isReady;
     private boolean isServed;
+    private boolean isPaid;
 
     public Order(MenuItem menuItem) {
         if (menuItem == null) {
@@ -12,6 +15,7 @@ public class Order {
         this.prepUnitsLeft = menuItem.getPreparationUnits();
         this.isReady = (this.prepUnitsLeft <= 0);
         this.isServed = false;
+        this.isPaid = false;
     }
 
     public Order(int choice) {
@@ -68,4 +72,13 @@ public class Order {
             isServed = true;
         }
     }
+
+    public boolean isPaid() {
+        return isPaid;
+    }
+
+    public void markPaid() {
+        this.isPaid = true;
+    }
 }
+
