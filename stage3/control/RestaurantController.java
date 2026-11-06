@@ -5,40 +5,41 @@ import entity.Table;
 import entity.customer.Customer;
 import entity.queue.PaymentQueue;
 import entity.queue.WaitingQueue;
-import entity.staff.Cashier;
-import entity.staff.Chef;
-import entity.staff.Host;
-import entity.staff.Waiter;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Top-level Turn Orchestrator and Facade (Controller Pattern).
- * Coordinates specialized sub-controllers adhering to the Single Responsibility Principle (SRP):
+ * Coordinates specialized sub-controllers adhering to the Single Responsibility Principle (SRP)
+ * and strict Encapsulation without performing console I/O:
  * - StaffController: Manages staff tasks (Host, Waiter, Chef, Cashier) and action quotas.
  * - CustomerController: Manages customer arrivals, eating progression, Happy Hour recovery, and decay/abandonment.
  * - GameScoreManager: Manages revenue, paid customer counts, satisfaction averages, and win/loss criteria.
  * - HappyHour: Manages the dynamic pricing policy and turn countdown (Section 4.3).
  */
 public class RestaurantController {
-    private final Table[] tables = new Table[2];
+    public static final int MAX_TURNS = 18;
+    public static final int TABLE_COUNT = 2;
+
+    private final List<Table> tables;
     private final WaitingQueue waitingQueue = new WaitingQueue();
     private final PaymentQueue paymentQueue = new PaymentQueue();
 
-    // Specialized SRP Sub-Controllers
     private final StaffController staffController = new StaffController();
     private final CustomerController customerController = new CustomerController();
     private final GameScoreManager scoreManager = new GameScoreManager();
-
-    // Stage 3 Dynamic Pricing Policy
     private final HappyHour happyHour = new HappyHour();
 
     private int currentTurn = 1;
 
     public RestaurantController() {
-        for (int i = 0; i < tables.length; i++) {
-            tables[i] = new Table(i + 1);
+        List<Table> initializedTables = new ArrayList<>(TABLE_COUNT);
+        for (int i = 1; i <= TABLE_COUNT; i++) {
+            initializedTables.add(new Table(i));
         }
+        this.tables = Collections.unmodifiableList(initializedTables);
     }
 
     // ==========================================
@@ -46,57 +47,39 @@ public class RestaurantController {
     // ==========================================
 
     /**
-     * Executes Step 1 (Start of Turn):
+     * Executes Step 1 (Start of Turn) domain transitions and returns structured event logs:
      * 1. Resets staff action flags for the new turn.
-     * 2. Displays turn header and active Happy Hour policy banner.
-     * 3. Automated Cashier Payment (oldest first, at most 1 per turn, freeing tables).
-     * 4. Automatic State Progression: Customers who finished eating become READY_TO_PAY.
-     * 5. Scheduled customer arrivals.
-     * 6. Happy Hour satisfaction recovery for waiting/unserved customers (+15) if active from prior turn.
-     * 7. Displays live metrics.
+     * 2. Automated Cashier Payment (oldest first, at most 1 per turn, freeing tables).
+     * 3. Automatic State Progression: Customers who finished eating become READY_TO_PAY.
+     * 4. Scheduled customer arrivals.
+     * 5. Happy Hour satisfaction recovery for waiting/unserved customers (+15) if active from prior turn.
      */
-    public void processTurnStart(int turn_num) {
-        this.currentTurn = turn_num;
+    public List<String> processTurnStart(int turnNumber) {
+        this.currentTurn = turnNumber;
+        List<String> events = new ArrayList<>();
 
-        // 1. Reset staff turns for the new turn
         staffController.resetStaffTurns();
+        staffController.processCashierPayment(paymentQueue, scoreManager, currentTurn, events);
+        customerController.processEatingProgression(tables, paymentQueue, turnNumber, events);
+        customerController.processArrivals(turnNumber, waitingQueue, events);
 
-        // 2. Clear Turn Header establishing the START of the turn
-        System.out.println("\n==========================================");
-        System.out.println(">>> TURN " + turn_num + " of 18 <<<");
         if (happyHour.isActive()) {
-            System.out.println("[POLICY] Happy Hour is ACTIVE! Remaining Turns: "
-                    + happyHour.getTurnsRemaining() + " | 20% discount on new orders");
-        }
-        System.out.println("==========================================");
-
-        // 3. Automated Cashier Payment at turn start (FIFO oldest-first, freeing tables immediately)
-        staffController.processCashierPayment(paymentQueue, scoreManager, currentTurn);
-
-        // 4. Automatic State Progression: Customers who finished eating become READY_TO_PAY
-        customerController.processEatingProgression(tables, paymentQueue, turn_num);
-
-        // 5. Scheduled arrivals (Turns 1, 4, 7, 10, 13, 16)
-        customerController.processArrivals(turn_num, waitingQueue);
-
-        // 6. If Happy Hour was already active from a previous turn, apply turn-start recovery (+15)
-        if (happyHour.isActive()) {
-            customerController.processHappyHourRecovery(waitingQueue, tables);
+            customerController.processHappyHourRecovery(waitingQueue, tables, events);
         }
 
-        // 7. Display live metrics after start-of-turn payment & arrivals
-        System.out.println("Revenue: $" + String.format("%.2f", scoreManager.getTotalRevenue())
-                + " | Paid: " + scoreManager.getPaidCustomerCount()
-                + " | Avg Sat: " + scoreManager.getAverageSatisfactionString());
+        return Collections.unmodifiableList(events);
     }
 
     /**
-     * Executes Step 3-5 (End of Turn):
-     * Performs satisfaction decay, handles customer abandonment, and decrements Happy Hour duration.
+     * Executes Steps 3-5 (End of Turn):
+     * Performs satisfaction decay, handles customer abandonment, decrements Happy Hour duration,
+     * and returns structured abandonment event logs.
      */
-    public void processTurnEnd() {
-        customerController.processDecayAndAbandonment(waitingQueue, tables, paymentQueue, scoreManager);
+    public List<String> processTurnEnd() {
+        List<String> events = new ArrayList<>();
+        customerController.processDecayAndAbandonment(waitingQueue, tables, paymentQueue, scoreManager, events);
         happyHour.endTurn();
+        return Collections.unmodifiableList(events);
     }
 
     // ==========================================
@@ -104,21 +87,17 @@ public class RestaurantController {
     // ==========================================
 
     /**
-     * Activates Happy Hour at the start of a turn.
+     * Activates Happy Hour at the start of a turn (once per game).
      * Triggers turn-start satisfaction recovery (+15) immediately for eligible customers.
-     *
-     * @return true if activation succeeded, false if already activated previously.
      */
-    public boolean activateHappyHour() {
-        boolean ok = happyHour.activate();
-        if (ok) {
-            System.out.println("[ACTION] Happy Hour successfully activated for 2 turns!");
-            // Immediate turn-start satisfaction recovery for eligible customers for the activation turn
-            customerController.processHappyHourRecovery(waitingQueue, tables);
-        } else {
-            System.out.println("[DENIED] Happy Hour has already been activated once this game.");
+    public ActionResult activateHappyHour() {
+        if (!happyHour.activate()) {
+            return ActionResult.denied("[DENIED] Happy Hour has already been activated once this game.");
         }
-        return ok;
+        List<String> messages = new ArrayList<>();
+        messages.add("[ACTION] Happy Hour successfully activated for 2 turns!");
+        customerController.processHappyHourRecovery(waitingQueue, tables, messages);
+        return ActionResult.success(messages);
     }
 
     public boolean isHappyHourActive() {
@@ -134,119 +113,104 @@ public class RestaurantController {
     }
 
     // ==========================================
-    // HOST ACTIONS (Stage 3)
+    // HOST, WAITER & CHEF FACADE COMMANDS
     // ==========================================
 
-    public boolean hostSeatCustomer(int tableIndex) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice (must be 1 to " + tables.length + ").");
-            return false;
+    private Table resolveTable(int tableNumber) {
+        if (tableNumber < 1 || tableNumber > tables.size()) {
+            return null;
         }
-        return staffController.hostSeatCustomer(waitingQueue, tables[tableIndex]);
+        return tables.get(tableNumber - 1);
     }
 
-    public void hostWait() {
-        staffController.hostWait();
-    }
-
-    public Host getHost() {
-        return staffController.getHost();
-    }
-
-    public boolean hasHostActed() {
-        return staffController.hasHostActed();
-    }
-
-    // ==========================================
-    // WAITER & CHEF ACTIONS
-    // ==========================================
-
-    public boolean seatCustomer(int tableIndex) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice (must be 1 to " + tables.length + ").");
-            return false;
+    public ActionResult hostSeatCustomer(int tableNumber) {
+        Table table = resolveTable(tableNumber);
+        if (table == null) {
+            return ActionResult.denied("[DENIED] Invalid table choice (must be 1 to " + tables.size() + ").");
         }
-        return staffController.seatCustomer(waitingQueue, tables[tableIndex]);
+        return staffController.hostSeatCustomer(waitingQueue, table);
     }
 
-    public boolean takeOrder(int tableIndex) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice.");
-            return false;
+    public ActionResult hostWait() {
+        return staffController.hostWait();
+    }
+
+    public ActionResult seatCustomer(int tableNumber) {
+        Table table = resolveTable(tableNumber);
+        if (table == null) {
+            return ActionResult.denied("[DENIED] Invalid table choice (must be 1 to " + tables.size() + ").");
         }
-        return staffController.takeOrder(tables[tableIndex], happyHour.isActive());
+        return staffController.seatCustomer(waitingQueue, table);
     }
 
-    public boolean takeOrder(int tableIndex, int menuChoice) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice.");
-            return false;
+    public ActionResult takeOrder(int tableNumber) {
+        Table table = resolveTable(tableNumber);
+        if (table == null) {
+            return ActionResult.denied("[DENIED] Invalid table choice (must be 1 to " + tables.size() + ").");
         }
-        return staffController.takeOrder(tables[tableIndex], menuChoice, happyHour.isActive());
+        return staffController.takeOrder(table, happyHour.isActive());
     }
 
-    public boolean serveFood(int tableIndex) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice.");
-            return false;
+    public ActionResult serveFood(int tableNumber) {
+        Table table = resolveTable(tableNumber);
+        if (table == null) {
+            return ActionResult.denied("[DENIED] Invalid table choice (must be 1 to " + tables.size() + ").");
         }
-        return staffController.serveFood(tables[tableIndex], scoreManager);
+        return staffController.serveFood(table, scoreManager);
     }
 
-    public void waiterWait() {
-        staffController.waiterWait();
+    public ActionResult waiterWait() {
+        return staffController.waiterWait();
     }
 
-    public boolean cookDish(int tableIndex) {
-        if (tableIndex < 0 || tableIndex >= tables.length) {
-            System.out.println("[DENIED] Invalid table choice for Chef.");
-            return false;
+    public ActionResult cookDish(int tableNumber) {
+        Table table = resolveTable(tableNumber);
+        if (table == null) {
+            return ActionResult.denied("[DENIED] Invalid table choice for Chef.");
         }
-        return staffController.cookDish(tables[tableIndex]);
+        return staffController.cookDish(table);
     }
 
-    public void chefWait() {
-        staffController.chefWait();
+    public ActionResult chefWait() {
+        return staffController.chefWait();
     }
 
     // ==========================================
-    // ACCESSORS
+    // READ-ONLY QUERIES FOR BOUNDARY LAYER
     // ==========================================
 
-    public StaffController getStaffController() {
-        return staffController;
+    public int getMaxTurns() {
+        return MAX_TURNS;
     }
 
-    public CustomerController getCustomerController() {
-        return customerController;
-    }
-
-    public GameScoreManager getScoreManager() {
-        return scoreManager;
-    }
-
-    public Waiter getWaiter() {
-        return staffController.getWaiter();
-    }
-
-    public Chef getChef() {
-        return staffController.getChef();
-    }
-
-    public Cashier getCashier() {
-        return staffController.getCashier();
-    }
-
-    public boolean hasWaiterActed() {
-        return staffController.hasWaiterActed();
-    }
-
-    public boolean hasChefActed() {
-        return staffController.hasChefActed();
+    public int getTableCount() {
+        return tables.size();
     }
 
     public int getCurrentTurn() {
         return currentTurn;
+    }
+
+    public List<Table> getTables() {
+        return tables;
+    }
+
+    public List<Table> getCookableTables() {
+        List<Table> cookable = new ArrayList<>();
+        for (Table table : tables) {
+            if (table.hasCookableOrder()) {
+                cookable.add(table);
+            }
+        }
+        return Collections.unmodifiableList(cookable);
+    }
+
+    public List<Customer> getWaitingQueue() {
+        return waitingQueue.getCustomers();
+    }
+
+    public boolean isWaitingQueueEmpty() {
+        return waitingQueue.isEmpty();
     }
 
     public double getTotalRevenue() {
@@ -277,23 +241,19 @@ public class RestaurantController {
         return scoreManager.getAverageSatisfactionString();
     }
 
-    public Table[] getTables() {
-        return tables;
+    public boolean isTargetCustomersMet() {
+        return scoreManager.isTargetCustomersMet();
     }
 
-    public List<Customer> getWaitingQueue() {
-        return waitingQueue.getCustomers();
+    public boolean isTargetRevenueMet() {
+        return scoreManager.isTargetRevenueMet();
     }
 
-    public WaitingQueue getWaitingQueueAsQueue() {
-        return waitingQueue;
+    public boolean isTargetSatisfactionMet() {
+        return scoreManager.isTargetSatisfactionMet();
     }
 
-    public PaymentQueue getPaymentQueue() {
-        return paymentQueue;
-    }
-
-    public boolean isGameOver() {
-        return currentTurn > 18;
+    public boolean isVictory() {
+        return scoreManager.isVictory();
     }
 }

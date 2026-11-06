@@ -1,15 +1,19 @@
 package control;
 
 /**
- * Manages game scoring, financial records, customer metrics,
- * and win/loss criteria evaluation (Single Responsibility Principle).
+ * Manages game scoring, financial records in integer cents, customer metrics,
+ * and win/loss criteria evaluation (Single Responsibility Principle & Information Expert).
  */
 public class GameScoreManager {
+    public static final int TARGET_PAID_CUSTOMERS = 4;
+    public static final int TARGET_REVENUE_CENTS = 4500;
+    public static final double TARGET_AVERAGE_SATISFACTION = 60.0;
+
     private int totalRevenueCents = 0;
     private int paidCustomerCount = 0;
     private int servedCustomerCount = 0;
     private int unhappyDepartures = 0;
-    private double totalSatisfactionOfPaidCustomers = 0.0;
+    private int totalSatisfactionOfPaidCustomers = 0;
 
     public void recordPayment(int cents, int satisfaction) {
         this.totalRevenueCents += cents;
@@ -49,30 +53,29 @@ public class GameScoreManager {
         if (paidCustomerCount == 0) {
             return 0.0;
         }
-        return totalSatisfactionOfPaidCustomers / paidCustomerCount;
+        return (double) totalSatisfactionOfPaidCustomers / paidCustomerCount;
     }
 
     public String getAverageSatisfactionString() {
         if (paidCustomerCount == 0) {
             return "N/A";
         }
-        return String.format("%.1f", totalSatisfactionOfPaidCustomers / paidCustomerCount);
+        return String.format("%.1f", getAverageSatisfactionNumeric());
     }
 
     public boolean isTargetCustomersMet() {
-        return paidCustomerCount >= 4;
+        return paidCustomerCount >= TARGET_PAID_CUSTOMERS;
     }
 
     public boolean isTargetRevenueMet() {
-        return getTotalRevenue() >= 45.0;
+        return totalRevenueCents >= TARGET_REVENUE_CENTS;
     }
 
     public boolean isTargetSatisfactionMet() {
-        return getAverageSatisfactionNumeric() >= 60.0;
+        return getAverageSatisfactionNumeric() >= TARGET_AVERAGE_SATISFACTION;
     }
 
     public boolean isVictory() {
         return isTargetCustomersMet() && isTargetRevenueMet() && isTargetSatisfactionMet();
     }
 }
-
