@@ -3,10 +3,10 @@ package entity.staff;
 /**
  * Abstract base class for all restaurant staff members (Generalization / Inheritance).
  * Encapsulates common turn-based action state and lifecycle operations,
- * adhering to the Liskov Substitution Principle (LSP) and eliminating code duplication.
+ * adhering to strict encapsulation and the Liskov Substitution Principle (LSP).
  */
 public abstract class Staff {
-    protected boolean actedThisTurn = false;
+    private boolean actedThisTurn = false;
 
     /**
      * Checks if the staff member has already taken an action in the current turn.
@@ -15,6 +15,13 @@ public abstract class Staff {
      */
     public boolean hasActed() {
         return actedThisTurn;
+    }
+
+    /**
+     * Marks this staff member as having consumed their turn quota.
+     */
+    protected void markActed() {
+        this.actedThisTurn = true;
     }
 
     /**
@@ -28,7 +35,7 @@ public abstract class Staff {
      * Marks the staff member as having waited / idled for the turn.
      */
     public void waitTurn() {
-        this.actedThisTurn = true;
+        markActed();
     }
 
     /**

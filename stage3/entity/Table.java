@@ -2,16 +2,29 @@ package entity;
 
 import entity.customer.Customer;
 
+/**
+ * Represents a dining table in the restaurant.
+ * Encapsulates seating state and provides Law-of-Demeter helpers for active orders.
+ */
 public class Table {
-    private int tableNumber;
+    private final int tableNumber;
     private Customer seatedCustomer;
 
     public Table(int tableNumber) {
+        if (tableNumber <= 0) {
+            throw new IllegalArgumentException("Table number must be positive");
+        }
         this.tableNumber = tableNumber;
         this.seatedCustomer = null;
     }
 
     public void seat(Customer customer) {
+        if (customer == null) {
+            throw new IllegalArgumentException("Cannot seat a null customer");
+        }
+        if (isOccupied()) {
+            throw new IllegalStateException("Table " + tableNumber + " is already occupied");
+        }
         this.seatedCustomer = customer;
     }
 
@@ -23,26 +36,19 @@ public class Table {
         this.seatedCustomer = null;
     }
 
-    // getters and setters
     public int getTableNumber() {
         return tableNumber;
     }
 
-    public Customer getseatedCustomer() {
+    public Customer getSeatedCustomer() {
         return seatedCustomer;
     }
 
-    public void setseatedCustomer(Customer customer) {
-        this.seatedCustomer = customer;
+    public Order getActiveOrder() {
+        return seatedCustomer != null ? seatedCustomer.getOrder() : null;
     }
 
-    // Aliases for convenience across controllers/view
-    public Customer getOccupiedBy() {
-        return seatedCustomer;
-    }
-
-    public void setOccupiedBy(Customer customer) {
-        this.seatedCustomer = customer;
+    public boolean hasCookableOrder() {
+        return seatedCustomer != null && seatedCustomer.hasCookableOrder();
     }
 }
-

@@ -2,7 +2,7 @@ package entity;
 
 /**
  * Combo meal menu item (Stage 3).
- * Composed of two existing menu items (Composite Pattern / Composition).
+ * Composed of two existing base menu items (Composite Pattern / Composition).
  * Section 4.3 rules:
  * - Preparation units = sum of its two components.
  * - Price = 90% of the components' combined price, rounded to nearest cent.
@@ -26,12 +26,20 @@ public class ComboMeal extends MenuItem {
         if (item == null) {
             throw new IllegalArgumentException(paramName + " cannot be null in a ComboMeal");
         }
+        if (!item.canBeComboComponent()) {
+            throw new IllegalArgumentException(paramName + " must be an individual base MenuItem, not a nested ComboMeal");
+        }
         return item;
     }
 
     private static int calculatePrice(MenuItem firstItem, MenuItem secondItem) {
         int totalPrice = firstItem.getPriceCents() + secondItem.getPriceCents();
         return (totalPrice * 90 + 50) / 100; // Integer half-up rounding to nearest cent
+    }
+
+    @Override
+    public boolean canBeComboComponent() {
+        return false;
     }
 
     public MenuItem getFirstItem() {

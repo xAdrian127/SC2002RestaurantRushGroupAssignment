@@ -17,6 +17,9 @@ public class Order {
         if (menuItem == null) {
             throw new IllegalArgumentException("MenuItem cannot be null for an Order");
         }
+        if (lockedPriceCents < 0) {
+            throw new IllegalArgumentException("Locked price cannot be negative");
+        }
         this.menuItem = menuItem;
         this.lockedPriceCents = lockedPriceCents;
         this.prepUnitsLeft = menuItem.getPreparationUnits();
@@ -30,7 +33,7 @@ public class Order {
     }
 
     public Order(int choice) {
-        this(Menu.Choice(choice));
+        this(Menu.getItem(choice));
     }
 
     public MenuItem getMenuItem() {
@@ -57,16 +60,12 @@ public class Order {
         return isReady;
     }
 
-    public void setReady(boolean ready) {
-        this.isReady = ready;
-    }
-
     public boolean isServed() {
         return isServed;
     }
 
-    public void setServed(boolean served) {
-        this.isServed = served;
+    public boolean isPaid() {
+        return isPaid;
     }
 
     public void advancePreparation() {
@@ -82,10 +81,6 @@ public class Order {
         if (isReady && !isServed) {
             isServed = true;
         }
-    }
-
-    public boolean isPaid() {
-        return isPaid;
     }
 
     public void markPaid() {

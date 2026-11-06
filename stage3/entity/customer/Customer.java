@@ -1,30 +1,56 @@
 package entity.customer;
 
 import entity.HappyHour;
-import entity.Menu;
 import entity.MenuItem;
 import entity.Order;
 
-public class Customer {
+/**
+ * Abstract base class representing a restaurant customer (Generalization / Polymorphism).
+ * Encapsulates satisfaction lifecycle, deterministic food choice contract, and order-time price locking.
+ */
+public abstract class Customer {
+    private static final int MAX_SATISFACTION = 100;
+    private static final int MIN_SATISFACTION = 0;
+
     private final String name;
+    private final int arrivalNumber;
     private int satisfaction;
     private CustomerState state;
     private Order order;
     private int turnBecameReadyToPay = -1;
 
-    public Customer(String name) {
+    protected Customer(String name, int arrivalNumber) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Customer name cannot be null or blank");
+        }
+        if (arrivalNumber <= 0) {
+            throw new IllegalArgumentException("Arrival number must be positive");
+        }
         this.name = name;
-        this.satisfaction = 100;
+        this.arrivalNumber = arrivalNumber;
+        this.satisfaction = MAX_SATISFACTION;
         this.state = CustomerState.QUEUED;
+    }
+
+    protected Customer(String name) {
+        this(name, 1);
     }
 
     /**
      * Polymorphic satisfaction decay rate per unserved waiting turn.
-     * Subclasses override this to implement specialized customer decay rates.
      */
-    public int getSatisfactionLossPerTurn() {
-        return 8; // Default loss for regular customers
-    }
+    public abstract int getSatisfactionLossPerTurn();
+
+    /**
+     * Polymorphic customer category label for display without reflection.
+     */
+    public abstract String getCustomerType();
+
+    /**
+     * Polymorphic deterministic food selection logic (Section 2.2).
+     * Customers select food based on their type and arrival sequence, never by manager input.
+     */
+    public abstract int chooseMenuChoice();
 
     /**
      * Polymorphically decreases satisfaction based on the customer's decay rate.
@@ -34,21 +60,50 @@ public class Customer {
     }
 
     public void decreaseSatisfaction(int points) {
-        // Only queued, seated, or ordered customers lose satisfaction
-        if (state == CustomerState.QUEUED ||
-                state == CustomerState.SEATED ||
-                state == CustomerState.ORDERED) {
-            this.satisfaction = Math.max(0, this.satisfaction - points);
-            // Auto-transition state if satisfaction reaches 0
-            if (this.satisfaction == 0) {
+        if (points <= 0) {
+            return;
+        }
+        if (isWaitingForTableOrFood()) {
+            this.satisfaction = Math.max(MIN_SATISFACTION, this.satisfaction - points);
+            if (this.satisfaction == MIN_SATISFACTION) {
                 this.state = CustomerState.LEFT_UNHAPPY;
             }
         }
     }
 
-    // Check if customer left unhappy
-    public boolean abandonment() {
+    /**
+     * Recovers satisfaction during active Happy Hour turns (Section 4.3).
+     * Only customers still waiting for a table or food (QUEUED, SEATED, ORDERED) are eligible,
+     * capped at 100.
+     *
+     * @param points Satisfaction points to recover.
+     * @return Actual points recovered (0 if ineligible or already at 100).
+     */
+    public int recoverSatisfaction(int points) {
+        if (points <= 0 || !isWaitingForTableOrFood() || this.satisfaction >= MAX_SATISFACTION) {
+            return 0;
+        }
+        int previous = this.satisfaction;
+        this.satisfaction = Math.min(MAX_SATISFACTION, this.satisfaction + points);
+        return this.satisfaction - previous;
+    }
+
+    public boolean isWaitingForTableOrFood() {
+        return state == CustomerState.QUEUED
+                || state == CustomerState.SEATED
+                || state == CustomerState.ORDERED;
+    }
+
+    public boolean hasAbandoned() {
         return this.state == CustomerState.LEFT_UNHAPPY;
+    }
+
+    public boolean hasOrdered() {
+        return this.order != null;
+    }
+
+    public boolean hasCookableOrder() {
+        return this.order != null && !this.order.isReady();
     }
 
     /**
@@ -68,32 +123,25 @@ public class Customer {
     }
 
     /**
-     * Polymorphic bill calculation in integer cents.
-     * Returns the locked bill stored in the order.
+     * Returns the locked bill stored in the order in integer cents.
      */
     public int calculateBillCents() {
         return order != null ? order.getPriceCents() : 0;
     }
 
     /**
-     * Polymorphic bill calculation in dollars.
+     * Returns the locked bill in dollars for display formatting.
      */
     public double calculateBill() {
         return calculateBillCents() / 100.0;
     }
 
-    /**
-     * Polymorphic food selection logic. Keeps domain rules encapsulated inside
-     * customer objects rather than leaking into the UI.
-     * Uses a documented deterministic preference to ensure reproducible runs (Section 2.2).
-     */
-    public int chooseMenuChoice() {
-        return (Math.abs(name.hashCode()) % Menu.getItemCount()) + 1;
-    }
-
-    // Getters and Setters
     public String getName() {
         return name;
+    }
+
+    public int getArrivalNumber() {
+        return arrivalNumber;
     }
 
     public CustomerState getState() {
@@ -106,10 +154,6 @@ public class Customer {
 
     public int getSatisfaction() {
         return satisfaction;
-    }
-
-    public void setSatisfaction(int satisfaction) {
-        this.satisfaction = satisfaction;
     }
 
     public Order getOrder() {

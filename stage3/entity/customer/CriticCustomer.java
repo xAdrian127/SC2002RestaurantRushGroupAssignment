@@ -5,6 +5,10 @@ package entity.customer;
  * turn, but becomes unforgiving below 50 satisfaction and then loses 17.
  */
 public class CriticCustomer extends Customer {
+    public CriticCustomer(String name, int arrivalNumber) {
+        super(name, arrivalNumber);
+    }
+
     public CriticCustomer(String name) {
         super(name);
     }
@@ -16,8 +20,8 @@ public class CriticCustomer extends Customer {
     }
 
     @Override
-    public double calculateBill() {
-        return super.calculateBill(); // Full price
+    public String getCustomerType() {
+        return "CriticCustomer";
     }
 
     @Override
@@ -28,4 +32,3 @@ public class CriticCustomer extends Customer {
         return 3;
     }
 }
-
