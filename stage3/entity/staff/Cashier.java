@@ -8,16 +8,13 @@ import entity.customer.CustomerState;
  * Cashier staff member.
  * Automatically processes at most 1 payment per turn,
  * handling the oldest READY_TO_PAY customer.
+ * Extends Staff to eliminate duplicate state and uphold LSP.
  */
-public class Cashier {
-    private boolean actedThisTurn = false;
+public class Cashier extends Staff {
 
-    public boolean hasActed() {
-        return actedThisTurn;
-    }
-
-    public void resetTurn() {
-        this.actedThisTurn = false;
+    @Override
+    public String getRoleName() {
+        return "Cashier";
     }
 
     /**
@@ -61,4 +58,3 @@ public class Cashier {
         return processPaymentCents(table) / 100.0;
     }
 }
-

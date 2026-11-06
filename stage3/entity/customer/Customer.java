@@ -1,6 +1,8 @@
 package entity.customer;
 
+import entity.HappyHour;
 import entity.Menu;
+import entity.MenuItem;
 import entity.Order;
 
 public class Customer {
@@ -50,9 +52,24 @@ public class Customer {
     }
 
     /**
+     * Polymorphically computes the locked bill in cents when an order is placed,
+     * applying customer discounts (e.g. VIP 10%) and dynamic policies (Happy Hour 20%).
+     *
+     * @param item              The menu item chosen.
+     * @param isHappyHourActive Whether Happy Hour is active when order is placed.
+     * @return Final locked bill in integer cents.
+     */
+    public int computeOrderBillCents(MenuItem item, boolean isHappyHourActive) {
+        int price = item.getPriceCents();
+        if (isHappyHourActive) {
+            price = HappyHour.calculateDiscount(price);
+        }
+        return price;
+    }
+
+    /**
      * Polymorphic bill calculation in integer cents.
-     * Stored in cents to avoid fractional floating-point rounding issues (Section 2.2).
-     * Subclasses override this to apply specialized pricing (e.g. VIP 10% discount).
+     * Returns the locked bill stored in the order.
      */
     public int calculateBillCents() {
         return order != null ? order.getPriceCents() : 0;

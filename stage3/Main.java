@@ -29,7 +29,69 @@ public class Main {
             printTableStatus(controller.getTables());
 
             // ----------------------------------------------------
-            // STEP 2A: Manager Choice - WAITER
+            // STEP 1B: Happy Hour Activation Prompt (Once per game)
+            // ----------------------------------------------------
+            if (!controller.isHappyHourActivated()) {
+                System.out.println("\n[HAPPY HOUR POLICY] Happy Hour is available (Activate once per game; lasts 2 turns with 20% order discount & +15 sat boost).");
+                boolean validHhInput = false;
+                while (!validHhInput) {
+                    System.out.print("Activate Happy Hour for Turn " + turn + "? (1 = Yes, 2 = No): ");
+                    int hhChoice = getSafeIntInput(scanner);
+                    if (hhChoice == -1) {
+                        return; // End of input stream
+                    }
+                    if (hhChoice == 1) {
+                        controller.activateHappyHour();
+                        validHhInput = true;
+                    } else if (hhChoice == 2) {
+                        validHhInput = true;
+                    } else {
+                        System.out.println("[INVALID] Choice must be 1 (Yes) or 2 (No).");
+                    }
+                }
+            }
+
+            // ----------------------------------------------------
+            // STEP 2A: Manager Choice - HOST (Stage 3 Role)
+            // ----------------------------------------------------
+            boolean hostActionDone = false;
+            while (!hostActionDone) {
+                System.out.println("\n[HOST ACTION] Select Host Task for Turn " + turn + ":");
+                System.out.println("1. Seat a customer");
+                System.out.println("2. Do Nothing / Wait");
+                System.out.print("Host Choice > ");
+
+                int hChoice = getSafeIntInput(scanner);
+                if (hChoice == -1) {
+                    return; // End of input stream
+                }
+
+                if (hChoice == 1) {
+                    if (controller.getWaitingQueue().isEmpty()) {
+                        System.out.println("[INVALID] Queue is empty, no customer to seat! Choose another action.");
+                        continue;
+                    }
+                    System.out.print("Which Table to seat at? (1 or 2, 0 to cancel): ");
+                    int tInput = getSafeIntInput(scanner);
+                    if (tInput == 0) {
+                        System.out.println("[CANCEL] Host action cancelled.");
+                        continue;
+                    }
+                    int tableIdx = tInput - 1;
+                    if (controller.hostSeatCustomer(tableIdx)) {
+                        hostActionDone = true;
+                    }
+                } else if (hChoice == 2) {
+                    controller.hostWait();
+                    System.out.println("[ACTION] Host remained idle / waited this turn.");
+                    hostActionDone = true;
+                } else {
+                    System.out.println("[INVALID] Choice must be 1 or 2. Please try again.");
+                }
+            }
+
+            // ----------------------------------------------------
+            // STEP 2B: Manager Choice - WAITER
             // ----------------------------------------------------
             boolean waiterActionDone = false;
             while (!waiterActionDone) {
@@ -93,7 +155,7 @@ public class Main {
             }
 
             // ----------------------------------------------------
-            // STEP 2B: Manager Choice - CHEF
+            // STEP 2C: Manager Choice - CHEF
             // (Chef may work on an order the Waiter took this turn)
             // ----------------------------------------------------
             Table[] currentTables = controller.getTables();
@@ -184,7 +246,7 @@ public class Main {
             }
 
             // ----------------------------------------------------
-            // Step 3-5: Turn End (Decay & Abandonment)
+            // Step 3-5: Turn End (Decay, Abandonment & Happy Hour Countdown)
             // ----------------------------------------------------
             controller.processTurnEnd();
 

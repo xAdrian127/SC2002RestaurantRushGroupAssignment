@@ -1,99 +1,82 @@
-# Stage 2: Customer Behaviour Extension
+# Stage 3: New Role, Menu Policy & Dynamic Pricing
 
 ## 1. Overview
 
-Stage 2 extends the restaurant management game by introducing polymorphic customer types alongside regular customers, fulfilling the requirements of **Section 4.2** of the assignment brief:
+Stage 3 completes the final functional tier of the Restaurant Rush turn-based management game by introducing the **Host** staff role, **ComboMeal** composition, and the **Happy Hour** dynamic pricing policy, fulfilling the requirements of **Section 4.3** of the assignment brief:
 
-- **RegularCustomer**: Loses 8 satisfaction points per unserved turn, pays full price. Food preference: Alice chooses Burger ($15.00), David chooses Salad ($9.00).
-- **VIPCustomer**: Loses 5 satisfaction points per unserved turn, receives a 10% discount on their total bill (stored in integer cents). Food preference: Burger ($13.50 discounted).
-- **CriticCustomer**: Loses 12 satisfaction points per eligible unserved turn, becoming unforgiving below 50 satisfaction (losing 17). Distinct order preference: Always orders Pasta (2 preparation units, $18.00) to rigorously test the kitchen's culinary craftsmanship. Pays full price.
-
-Arrival schedule cycles across turns 1, 4, 7, 10, 13, and 16:
-
-- Turn 1: Alice (`RegularCustomer`)
-- Turn 4: Bob (`VIPCustomer`)
-- Turn 7: Charlie (`CriticCustomer`)
-- Turn 10: David (`RegularCustomer`)
-- Turn 13: Edward (`VIPCustomer`)
-- Turn 16: Faith (`CriticCustomer`)
+- **Host (`Host.java`)**: Seats at most one queued customer per turn at an available table in addition to the Waiter's action. The Waiter retains the ability to seat customers. This allows concurrent seating and order taking or serving in a single turn.
+- **ComboMeal (`ComboMeal.java`)**: A composite menu item composed of two base menu items (Composite Pattern / Composition). Preparation units equal the sum of both components. The price is calculated as 90% of the combined component price, rounded to the nearest integer cent.
+  - Choice 4: **Salad + Pasta Combo** — $24.30 (900 + 1800 = 2700 * 0.90), 3 preparation units (Section 4.3 example).
+  - Choice 5: **Burger + Pasta Combo** — $29.70 (1500 + 1800 = 3300 * 0.90), 3 preparation units.
+- **Documented Customer Food Preferences**:
+  - `RegularCustomer` Alice chooses Burger ($15.00, 1 prep); David chooses **ComboMeal** (Salad + Pasta Combo, $24.30, 3 prep).
+  - `VIPCustomer` Bob chooses Burger ($13.50 VIP, or $10.80 during Happy Hour); Edward chooses **ComboMeal** (Burger + Pasta Combo, $26.73 VIP, 3 prep).
+  - `CriticCustomer` Charlie and Faith choose Pasta ($18.00, 2 prep).
+- **Happy Hour Policy (`HappyHour.java`)**: A dynamic pricing policy the manager can switch on once per game at the start of a turn.
+  - Duration: Active for the activation turn and the next turn (2 turns total). The remaining duration is displayed in the turn header.
+  - **Price Locking**: Orders taken while active receive a 20% discount on their bill, locked into the order at order placement time. For VIP customers, the 10% VIP discount is applied first, followed by the 20% Happy Hour discount ($15.00 * 0.90 * 0.80 = $10.80, Section 4.3 example). Orders placed before Happy Hour remain unaffected.
+  - **Satisfaction Recovery**: During each active turn, customers still waiting for a table (in queue) or waiting for food (seated, unserved) recover 15 satisfaction at turn start (capped at 100). Customers already eating or ready to pay do not recover satisfaction.
 
 ---
 
-## 2. Key Architectural Improvements over Stage 1 (Design Reflection)
+## 2. Key Architectural Improvements over Stage 2 (Design Reflection)
 
-### A. Polymorphic Billing (Open-Closed Principle - OCP)
+### A. Generalization & Staff Hierarchy (`abstract class Staff`)
+- **Stage 2 Limitation**: In Stage 2, `Waiter`, `Chef`, and `Cashier` each redundantly duplicated the exact same turn-tracking attributes and methods (`actedThisTurn`, `hasActed()`, `resetTurn()`, `waitTurn()`).
+- **Stage 3 Refactoring**: Extracted an `abstract class Staff` in `entity/staff/`. All staff roles (`Waiter`, `Chef`, `Cashier`, `Host`) now inherit from `Staff`. This strictly enforces the **Liskov Substitution Principle (LSP)**, eliminates code duplication (**DRY**), and demonstrates clear generalization/specialization for the UML Class Diagram.
 
-- **Stage 1 Limitation**: In early implementations, specialized billing was either omitted or checked procedurally in the turn controller using `instanceof` checks (`if (c instanceof VIPCustomer)`).
-- **Stage 2 Refactoring**: Dispatched bill calculations polymorphically through `Customer.calculateBill()`. `VIPCustomer` overrides this method to apply its 10% discount (`super.calculateBill() * 0.90`). `RestaurantController` requires **zero type checks**, maintaining full adherence to OCP.
+### B. Composite Menu Design (Open-Closed Principle - OCP)
+- **Stage 2 Limitation**: Only static atomic menu items existed.
+- **Stage 3 Refactoring**: `ComboMeal` extends `MenuItem` while holding references to two component `MenuItem` objects (**Composite Pattern**). Because `ComboMeal` *is-a* `MenuItem`, the kitchen (`Chef`), order system (`Order`), and Waiter interact with combo meals polymorphically without requiring special-case `instanceof ComboMeal` branches in the controllers.
 
-### B. Polymorphic Satisfaction Decay (Liskov Substitution Principle - LSP)
+### C. Information Expert & Order-Time Price Locking
+- **Stage 2 Limitation**: In early designs, bill discounts were calculated on the fly at payment time. In Stage 3, dynamic policies (Happy Hour) and expiration mean that computing prices at checkout would erroneously discount orders placed prior to Happy Hour or forfeit discounts for orders placed during Happy Hour that pay after it ends.
+- **Stage 3 Refactoring**: Adhering to the **Information Expert** pattern, `Customer.computeOrderBillCents(item, isHappyHourActive)` computes the final bill upon order taking. The price is locked inside `Order.lockedPriceCents` when the order is created. When the Cashier processes payment turns later, `calculateBillCents()` reads the immutable locked price.
 
-- **Stage 1 Limitation**: The turn controller hardcoded and passed a decay argument of `8` (`decreaseSatisfaction(8)`), which subclasses had to ignore or override inconsistently.
-- **Stage 2 Refactoring**: Each customer subclass encapsulates its own decay rate via `getSatisfactionLossPerTurn()`. The controller simply invokes `c.decaySatisfaction()`. Subclasses safely substitute for the base class without violating behavioral contracts.
+### D. Preserving Controller Decomposition (Single Responsibility Principle - SRP)
+- Rather than bloating `RestaurantController` into a God class with Stage 3 features:
+  - **`StaffController`**: Takes responsibility for coordinating the new `Host` role alongside `Waiter`, `Chef`, and `Cashier`, enforcing turn quotas.
+  - **`CustomerController`**: Takes responsibility for the Happy Hour satisfaction recovery (+15) across eligible customer states (`QUEUED`, `SEATED`, `ORDERED`).
+  - **`RestaurantController`**: Acts as a lightweight Facade orchestrating high-level turn steps and managing the `HappyHour` policy lifecycle.
 
-### C. Encapsulation of Domain Rules (Boundary vs. Entity Separation)
-
-- **Stage 1 Limitation**: Food selection was randomly rolled in `Main.java` (the UI Boundary layer) and passed into `controller.takeOrder(tableIdx, choice)`, violating the rule: _"Keep rules out of the UI. The UI only collects the manager's decisions and displays the state."_
-- **Stage 2 Refactoring**: Food selection is encapsulated inside `Customer.chooseMenuChoice()`. When the Waiter takes an order at a table, the seated customer decides what to order based on their preferences. `Main.java` only issues the command `controller.takeOrder(tableIdx)`.
-
-### D. Start-of-Turn Cashier Payment & Multi-Table Oldest-First Tracking
-
-- **Stage 1 Limitation**: Payment was processed at turn end, meaning a customer who finished eating had to hold the table for an entire additional turn after becoming `READY_TO_PAY`. Additionally, a single integer flag (`tableBecameReadyThisTurn`) was vulnerable to being overwritten if multiple tables finished eating on the same turn.
-- **Stage 2 Refactoring**: Cashier payment is executed at the **start of the turn** for any customer who reached `READY_TO_PAY` on an earlier turn (`turnBecameReadyToPay < currentTurn`). This immediately frees the table so the manager can seat waiting customers during that same turn. Multi-table prioritization uses `turnBecameReadyToPay` to strictly honor the **oldest-first** cashier rule.
-
-### E. Queue Data Structure Integration (WaitingQueue & PaymentQueue)
-
-- **`WaitingQueue`**: Encapsulates FIFO queue manipulation for arriving customers waiting to be seated.
-- **`PaymentQueue`**: Encapsulates FIFO payment processing for customers ready to pay, naturally enforcing the assignment rule that the Cashier processes payments in **oldest-first** order.
-
-### F. Single Responsibility Principle (SRP) Controller Decomposition
-
-To eliminate the "Fat / God Controller" anti-pattern from Stage 1, the controller layer was decomposed into 4 highly cohesive, focused classes:
-- **`RestaurantController` (Facade Orchestrator)**: Coordinates high-level turn loop progression and delegates tasks to specialized sub-controllers without managing low-level staff mechanics or scoring formulas.
-- **`StaffController`**: Manages operational staff coordination (`Waiter`, `Chef`, `Cashier`), enforces per-turn action quotas, and executes seating, ordering, cooking, and billing tasks. (Extensible for the Stage 3 `Host` role).
-- **`CustomerController`**: Manages customer domain lifecycles: scheduled arrivals (Turns 1, 4, 7, 10, 13, 16), eating state transitions (`SERVED` $\rightarrow$ `READY_TO_PAY`), and polymorphic turn-end satisfaction decay/abandonment.
-- **`GameScoreManager`**: Manages financial accounting in integer cents (Section 2.2), customer counts, satisfaction averages, and victory/defeat target evaluation.
-
-### G. Package Architecture
-
-- **Root Entrypoint**: User interface and CLI presentation driver (`Main.java`). Handles input/output and rendering; decoupled from domain game rules.
-- **`control/`**: Business logic, turn coordination, staff dispatching, customer lifecycles, and scoring (`RestaurantController`, `StaffController`, `CustomerController`, `GameScoreManager`).
-- **`entity/`**: Core restaurant domain models (`Table`, `Order`, `MenuItem`, `Menu`).
-  - **`entity/customer/`**: Specialized customer domain package encapsulating customer hierarchy and behaviors (`Customer`, `CustomerState`, `RegularCustomer`, `VIPCustomer`, `CriticCustomer`).
-  - **`entity/staff/`**: Staff roles performing turn actions (`Waiter`, `Chef`, `Cashier`).
-  - **`entity/queue/`**: FIFO queue data structures for restaurant operations (`WaitingQueue`, `PaymentQueue`).
+### E. Boundary-Control-Entity (BCE) Decoupling
+- Input prompts for activating Happy Hour and Host seating actions remain strictly inside `Main.java` (Boundary Layer).
+- Domain rules (discount calculations, satisfaction boost capping, queue operations) remain encapsulated inside `entity/` and `control/`.
 
 ---
 
 ## 3. User Inputs and Expected Results
 
-### 1. Waiter Actions
+### 1. Happy Hour Prompt (Turn Start)
+- Shown once per game until activated:
+  `Activate Happy Hour for Turn X? (1 = Yes, 2 = No): `
+- Entering `1` activates Happy Hour for 2 turns and immediately grants +15 satisfaction recovery to eligible waiting/unserved customers.
 
-| 1st Input | 2nd Input | Action           | Prompt                                                     | Expected Result                                                        |
-| --------- | --------- | ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------- |
-| 1         | 1         | Seat customer    | Which table to seat at? (1 or 2, 0 to cancel):             | Seats the first waiting customer at Table 1.                           |
-| 1         | 2         | Seat customer    | Which table to seat at? (1 or 2, 0 to cancel):             | Seats the first waiting customer at Table 2.                           |
-| 2         | 1         | Take Order       | Which Table to take order for? (1 or 2, 0 to cancel):      | Takes order at Table 1. Seated customer selects dish polymorphically.  |
-| 2         | 2         | Take Order       | Which Table to take order for? (1 or 2, 0 to cancel):      | Takes order at Table 2. Seated customer selects dish polymorphically.  |
-| 3         | 1         | Serve Food       | Which Table to serve READY food to? (1 or 2, 0 to cancel): | Serves READY order at Table 1. Customer satisfaction stops decreasing. |
-| 3         | 2         | Serve Food       | Which Table to serve READY food to? (1 or 2, 0 to cancel): | Serves READY order at Table 2. Customer satisfaction stops decreasing. |
-| 4         | -         | Wait             | -                                                          | Waiter performs no task for the turn.                                  |
-| 1, 2 or 3 | 0         | Cancel Selection | Waiter choice prompt                                       | Cancels selection and returns to Waiter menu without consuming action. |
+### 2. Host Actions (Step 2A)
+| 1st Input | 2nd Input | Action | Expected Result |
+| :---: | :---: | :--- | :--- |
+| 1 | 1 | Seat customer at Table 1 | Dequeues the first waiting customer and seats them at Table 1. |
+| 1 | 2 | Seat customer at Table 2 | Dequeues the first waiting customer and seats them at Table 2. |
+| 2 | - | Wait / Do Nothing | Host performs no action this turn. |
+| 1 | 0 | Cancel Selection | Cancels seating and returns to Host menu without consuming action. |
 
-### 2. Chef Actions
+### 3. Waiter Actions (Step 2B)
+- **Option 1**: Seat customer at Table 1 or 2 (can seat another customer if queue has people and another table is free).
+- **Option 2**: Take order at Table 1 or 2 (seated customer polymorphically selects food and locks bill).
+- **Option 3**: Serve READY food at Table 1 or 2.
+- **Option 4**: Wait / Do Nothing.
 
-- **Option 1/2**: Prepare one unit for a pending table order.
-- **Wait**: Chef remains idle for the turn.
-- Invalid table choices or commands are denied without consuming the Chef's turn.
+### 4. Chef Actions (Step 2C)
+- Advance preparation by 1 unit on pending table orders, or wait.
 
 ---
 
 ## 4. Build & Execution
 
-To compile and run Stage 2 from the `stage2` directory:
+To compile and run Stage 3 from the `stage3/` directory:
 
 ```bash
-# Compile all source files and packages
+# Compile all packages and source files
 javac Main.java control/*.java entity/*.java entity/customer/*.java entity/staff/*.java entity/queue/*.java
 
 # Run the game
@@ -111,49 +94,56 @@ Or execute the automated batch file:
 ## 5. Reproducible Test Runs (Section 4.1 & 7 Grading Evidence)
 
 ### A. Reproducible Victory Run (Passed All 3 Criteria)
-**Objective targets met at Turn 18**:
-- Paid Customers: **4** (Target >= 4) -> **PASSED**
-- Total Revenue: **$55.50** (Target >= $45.00) -> **PASSED** (Alice $15.00 + Bob $13.50 + Charlie $18.00 + David $9.00)
-- Average Paid Satisfaction: **78.5** (Target >= 60.0) -> **PASSED**
-- Result: **VICTORY!**
 
-**Turn-by-turn Manager Input Sequence**:
-| Turn | Customer Event | Waiter Action | Chef Action | End-of-Turn Notes |
-|:---:|:---|:---|:---|:---|
-| 1 | Alice (`Regular`) arrives | `1 1` (Seat Table 1) | `1` (Wait) | Alice seated at Table 1 (Sat: 92) |
-| 2 | - | `2 1` (Take order T1: Burger) | `1` (Cook T1) | Burger is READY (Sat: 84) |
-| 3 | - | `3 1` (Serve Table 1) | `1` (Wait) | Alice SERVED; eating begins (Sat: 84) |
-| 4 | Bob (`VIP`) arrives; Alice finishes eating | `1 2` (Seat Table 2) | `1` (Wait) | Bob seated at Table 2; Alice READY_TO_PAY |
-| 5 | Cashier pays Alice ($15.00); T1 freed | `2 2` (Take order T2: Burger) | `1` (Cook T2) | Bob's Burger READY (Sat: 90) |
-| 6 | - | `3 2` (Serve Table 2) | `1` (Wait) | Bob SERVED; eating begins (Sat: 90) |
-| 7 | Charlie (`Critic`) arrives; Bob finishes eating | `1 1` (Seat Table 1) | `1` (Wait) | Charlie seated at T1; Bob READY_TO_PAY |
-| 8 | Cashier pays Bob ($13.50 VIP); T2 freed | `2 1` (Take order T1: Pasta) | `1` (Cook T1) | Charlie Pasta prep unit 1 done |
-| 9 | - | `4` (Wait) | `1` (Cook T1) | Charlie Pasta prep unit 2 done; READY |
-| 10 | David (`Regular`) arrives | `3 1` (Serve Table 1) | `1` (Wait) | Charlie SERVED; eating begins (Sat: 64) |
-| 11 | Charlie finishes eating | `1 2` (Seat Table 2) | `1` (Wait) | David seated at T2; Charlie READY_TO_PAY |
-| 12 | Cashier pays Charlie ($18.00); T1 freed | `2 2` (Take order T2: Salad) | `1` (Cook T2) | David's Salad is READY |
-| 13 | Edward (`VIP`) arrives | `3 2` (Serve Table 2) | `1` (Wait) | David SERVED; eating begins (Sat: 76) |
-| 14 | David finishes eating | `4` (Wait) | `1` (Wait) | David READY_TO_PAY |
-| 15 | Cashier pays David ($9.00); T2 freed | `4` (Wait) | `1` (Wait) | Paid: 4, Revenue: $55.50, Avg Sat: 78.5 |
-| 16 | Faith (`Critic`) arrives | `4` (Wait) | `1` (Wait) | Idle turns to fulfill 18-turn game loop |
-| 17 | - | `4` (Wait) | `1` (Wait) | Idle turns to fulfill 18-turn game loop |
-| 18 | Final turn evaluation | `4` (Wait) | `1` (Wait) | **VICTORY ACHIEVED!** |
+**Objective Targets Met at Turn 18**:
+- Paid Customers: **4** (Target $\ge$ 4) $\rightarrow$ **PASSED**
+- Total Revenue: **$68.10** (Target $\ge$ $45.00) $\rightarrow$ **PASSED**
+  - Alice (Turn 4 Cashier): **$15.00** (Regular Burger)
+  - Bob (Turn 7 Cashier): **$10.80** (VIP Burger ordered during Happy Hour: $15.00 * 0.90 * 0.80 = $10.80 locked)
+  - Charlie (Turn 11 Cashier): **$18.00** (Critic Pasta)
+  - David (Turn 15 Cashier): **$24.30** (Regular Salad + Pasta Combo)
+- Average Paid Satisfaction: **86.0** (Target $\ge$ 60.0) $\rightarrow$ **PASSED**
+- Unhappy Departures: **0**
+- Overall Result: **VICTORY!**
 
-**One-line input stream for TA replication**:
+**Turn-by-turn Manager Strategy**:
+1. **Turn 1**: Alice arrives. Host seats Alice at Table 1. Waiter immediately takes Alice's Burger order on the same turn! Chef cooks unit 1 $\rightarrow$ Burger READY!
+2. **Turn 2**: Waiter serves Burger to Alice. Alice begins eating.
+3. **Turn 3**: Alice finishes eating $\rightarrow$ READY_TO_PAY.
+4. **Turn 4**: Cashier pays Alice ($15.00); T1 freed. Bob (VIP) arrives. **Manager activates Happy Hour!** Host seats Bob at T1. Waiter takes Bob's order: Burger locked at $10.80 (VIP + Happy Hour). Chef cooks $\rightarrow$ READY!
+5. **Turn 5**: Waiter serves Burger to Bob. Bob begins eating. Happy Hour turn 2 concludes.
+6. **Turn 6**: Bob finishes eating $\rightarrow$ READY_TO_PAY.
+7. **Turn 7**: Cashier pays Bob ($10.80); T1 freed. Charlie (Critic) arrives. Host seats Charlie at T1. Waiter takes Charlie's Pasta order. Chef cooks unit 1.
+8. **Turn 8**: Chef cooks unit 2 $\rightarrow$ Pasta READY!
+9. **Turn 9**: Waiter serves Pasta to Charlie. Charlie begins eating.
+10. **Turn 10**: Charlie finishes eating (READY_TO_PAY). David (Regular) arrives. Host seats David at Table 2. Waiter takes David's order: **ComboMeal** (Salad + Pasta Combo, $24.30, 3 prep units). Chef cooks unit 1.
+11. **Turn 11**: Cashier pays Charlie ($18.00); T1 freed. Chef cooks unit 2 for David.
+12. **Turn 12**: Chef cooks unit 3 for David $\rightarrow$ ComboMeal READY!
+13. **Turn 13**: Edward (VIP) arrives. Host seats Edward at T1. Waiter serves David at T2!
+14. **Turn 14**: David finishes eating. Waiter takes Edward's order: **ComboMeal** (Burger + Pasta Combo, $26.73 VIP). Chef cooks unit 1 for Edward.
+15. **Turn 15**: Cashier pays David ($24.30 ComboMeal); T2 freed. Edward unit 2 cooked.
+16. **Turn 16**: Faith (Critic) arrives. Edward unit 3 cooked $\rightarrow$ READY!
+17. **Turn 17**: Waiter serves Edward.
+18. **Turn 18**: Turn 18 completes. Final victory targets evaluated.
+
+**One-line Input Stream for TA Replication**:
 ```text
-1 1 1 2 1 1 3 1 1 1 2 1 2 2 1 3 2 1 1 1 1 2 1 1 4 1 3 1 1 1 2 1 2 2 1 3 2 1 4 1 4 1 4 1 4 1 4 1
+2 1 1 2 1 1 2 2 3 1 1 2 2 4 1 1 1 1 2 1 1 2 3 1 1 2 4 1 1 1 2 1 1 2 4 1 2 3 1 1 1 2 2 2 1 2 4 1 2 4 1 1 1 3 2 1 2 2 1 1 2 4 1 2 4 1 2 3 1 1 2 4 1
 ```
 
 ---
 
-### B. Reproducible Defeat Run (Customer Abandonment)
-**Objective targets evaluated at Turn 18**:
-- Paid Customers: **0** (Target >= 4) -> **FAILED**
-- Total Revenue: **$0.00** (Target >= $45.00) -> **FAILED**
-- Average Paid Satisfaction: **N/A** (Target >= 60.0) -> **FAILED**
+### B. Reproducible Defeat Run (Manager Inaction)
+
+**Objective Targets Evaluated at Turn 18**:
+- Paid Customers: **0** (Target $\ge$ 4) $\rightarrow$ **FAILED**
+- Total Revenue: **$0.00** (Target $\ge$ $45.00) $\rightarrow$ **FAILED**
+- Average Paid Satisfaction: **N/A** (Target $\ge$ 60.0) $\rightarrow$ **FAILED**
+- Unhappy Departures: **2** (Alice and Charlie reach 0 satisfaction and abandon the queue)
 - Result: **DEFEAT!**
 
-**Execution**: The manager enters `4` (Waiter wait) and `1` (Chef wait) across all 18 turns. Waiting customers undergo satisfaction decay until reaching 0 and abandon the queue without paying.
+**One-line Input Stream for TA Replication**:
+Manager enters `2` (No Happy Hour), `2` (Host wait), `4` (Waiter wait), `1` (Chef wait) across all 18 turns:
 ```text
-4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1 4 1
+2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1 2 2 4 1
 ```

@@ -6,16 +6,18 @@ import entity.queue.PaymentQueue;
 import entity.queue.WaitingQueue;
 import entity.staff.Cashier;
 import entity.staff.Chef;
+import entity.staff.Host;
 import entity.staff.Waiter;
 
 /**
  * Manages staff coordination and action dispatching (Single Responsibility Principle).
- * Encapsulates Waiter tasks, Chef cooking, Cashier billing, and turn action rules.
+ * Encapsulates Waiter tasks, Host seating, Chef cooking, Cashier billing, and turn action rules.
  */
 public class StaffController {
     private final Waiter waiter = new Waiter();
     private final Chef chef = new Chef();
     private final Cashier cashier = new Cashier();
+    private final Host host = new Host();
 
     /**
      * Resets action flags for all staff members at the start of a turn.
@@ -24,6 +26,45 @@ public class StaffController {
         waiter.resetTurn();
         chef.resetTurn();
         cashier.resetTurn();
+        host.resetTurn();
+    }
+
+    // ==========================================
+    // HOST ACTIONS (Stage 3)
+    // ==========================================
+
+    public boolean hostSeatCustomer(WaitingQueue waitingQueue, Table table) {
+        if (table == null) {
+            System.out.println("[DENIED] Invalid table choice.");
+            return false;
+        }
+        if (waitingQueue.isEmpty()) {
+            System.out.println("[DENIED] Cannot seat customer: waiting queue is empty.");
+            return false;
+        }
+        if (table.isOccupied()) {
+            System.out.println("[DENIED] Table " + table.getTableNumber() + " is already occupied.");
+            return false;
+        }
+        Customer c = waitingQueue.removeFirst();
+        boolean seated = host.seat(c, table);
+        if (!seated) {
+            waitingQueue.add(c); // Restore customer if seating failed
+            return false;
+        }
+        return true;
+    }
+
+    public void hostWait() {
+        host.waitTurn();
+    }
+
+    public Host getHost() {
+        return host;
+    }
+
+    public boolean hasHostActed() {
+        return host.hasActed();
     }
 
     // ==========================================
@@ -52,20 +93,28 @@ public class StaffController {
         return true;
     }
 
-    public boolean takeOrder(Table table) {
+    public boolean takeOrder(Table table, boolean isHappyHourActive) {
         if (table == null) {
             System.out.println("[DENIED] Invalid table choice.");
             return false;
         }
-        return waiter.takeOrder(table);
+        return waiter.takeOrder(table, isHappyHourActive);
+    }
+
+    public boolean takeOrder(Table table) {
+        return takeOrder(table, false);
+    }
+
+    public boolean takeOrder(Table table, int menuChoice, boolean isHappyHourActive) {
+        if (table == null) {
+            System.out.println("[DENIED] Invalid table choice.");
+            return false;
+        }
+        return waiter.takeOrder(table, menuChoice, isHappyHourActive);
     }
 
     public boolean takeOrder(Table table, int menuChoice) {
-        if (table == null) {
-            System.out.println("[DENIED] Invalid table choice.");
-            return false;
-        }
-        return waiter.takeOrder(table, menuChoice);
+        return takeOrder(table, menuChoice, false);
     }
 
     public boolean serveFood(Table table, GameScoreManager scoreManager) {
@@ -166,4 +215,3 @@ public class StaffController {
         return cashier.hasActed();
     }
 }
-

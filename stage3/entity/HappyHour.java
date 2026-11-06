@@ -1,46 +1,61 @@
 package entity;
-public class HappyHour{
+
+/**
+ * Happy Hour dynamic pricing policy (Stage 3).
+ * Activated once per game at turn start; lasts for that turn and the next (2 turns total).
+ * Section 4.3 requirements:
+ * - Orders taken while it is active get 20% off their bill (locked when order is taken).
+ * - During each active turn, customers still waiting for a table or food recover 15 satisfaction at turn start.
+ * - Displays its remaining duration.
+ */
+public class HappyHour {
     private boolean activated = false;
     private int turnsRemaining = 0;
 
-    //Activate Happy Hour once per game
-    public boolean activate(){
-        if (activated){
-            System.out.println("[DENIED] Happy Hour has already been activated.");
+    /**
+     * Activates Happy Hour once per game.
+     *
+     * @return true if activation succeeded, false if already activated previously.
+     */
+    public boolean activate() {
+        if (activated) {
             return false;
         }
-
         activated = true;
-        turnsRemaining = 2;
-        System.out.println("[ACTION] Happy Hour activated for 2 turns.");
+        turnsRemaining = 2; // Active for this turn and the next turn
         return true;
     }
 
-    public boolean isActive(){
-        return turnsRemaining>0;
+    public boolean isActivated() {
+        return activated;
     }
 
-    public int getTurnsRemaining(){
+    public boolean isActive() {
+        return turnsRemaining > 0;
+    }
+
+    public int getTurnsRemaining() {
         return turnsRemaining;
     }
 
-    public void endTurn(){
-        if (turnsRemaining>0){
+    /**
+     * Decrements the remaining duration at the end of each turn.
+     */
+    public void endTurn() {
+        if (turnsRemaining > 0) {
             turnsRemaining--;
         }
     }
 
-    public int applyDiscount(int priceCents){
-        if (!isActive()){
-            return priceCents;
-        }
-        return (priceCents*80+50)/100;
-    }
-
-    public int boostSatisfaction(int satisfaction){
-        if (!isActive()){
-            return satisfaction;
-        }
-        return Math.min(100,satisfaction+15);
+    /**
+     * Pure calculation: applies the 20% Happy Hour discount (retains 80%)
+     * rounded to the nearest cent using integer arithmetic.
+     * Section 4.3 rule: (price * 80 + 50) / 100.
+     *
+     * @param priceCents Price in cents before Happy Hour discount.
+     * @return Discounted price in cents.
+     */
+    public static int calculateDiscount(int priceCents) {
+        return (priceCents * 80 + 50) / 100;
     }
 }

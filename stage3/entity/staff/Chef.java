@@ -4,19 +4,16 @@ import entity.Order;
 import entity.Table;
 import entity.customer.Customer;
 
-public class Chef {
-    private boolean actedThisTurn = false;
+/**
+ * Chef staff role.
+ * Advances one preparation unit per turn for a chosen pending order.
+ * Extends Staff to eliminate duplicate state and uphold LSP.
+ */
+public class Chef extends Staff {
 
-    public boolean hasActed() {
-        return actedThisTurn;
-    }
-
-    public void resetTurn() {
-        this.actedThisTurn = false;
-    }
-
-    public void waitTurn() {
-        this.actedThisTurn = true;
+    @Override
+    public String getRoleName() {
+        return "Chef";
     }
 
     public boolean cook(Table table) {
@@ -58,4 +55,3 @@ public class Chef {
         }
     }
 }
-

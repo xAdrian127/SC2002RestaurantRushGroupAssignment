@@ -1,21 +1,32 @@
 package entity;
 
+/**
+ * Encapsulates an individual food order.
+ * Stores preparation units, dish status (READY, SERVED, PAID), and the locked price in cents.
+ * Fulfills Section 4.3 rule: Price is locked when the order is placed and does not change retroactively.
+ */
 public class Order {
     private final MenuItem menuItem;
+    private final int lockedPriceCents;
     private int prepUnitsLeft;
     private boolean isReady;
     private boolean isServed;
     private boolean isPaid;
 
-    public Order(MenuItem menuItem) {
+    public Order(MenuItem menuItem, int lockedPriceCents) {
         if (menuItem == null) {
             throw new IllegalArgumentException("MenuItem cannot be null for an Order");
         }
         this.menuItem = menuItem;
+        this.lockedPriceCents = lockedPriceCents;
         this.prepUnitsLeft = menuItem.getPreparationUnits();
         this.isReady = (this.prepUnitsLeft <= 0);
         this.isServed = false;
         this.isPaid = false;
+    }
+
+    public Order(MenuItem menuItem) {
+        this(menuItem, menuItem.getPriceCents());
     }
 
     public Order(int choice) {
@@ -31,11 +42,11 @@ public class Order {
     }
 
     public double getPrice() {
-        return menuItem.getPriceCents() / 100.0;
+        return lockedPriceCents / 100.0;
     }
 
     public int getPriceCents() {
-        return menuItem.getPriceCents();
+        return lockedPriceCents;
     }
 
     public int getPrepUnitsLeft() {
@@ -81,4 +92,3 @@ public class Order {
         this.isPaid = true;
     }
 }
-

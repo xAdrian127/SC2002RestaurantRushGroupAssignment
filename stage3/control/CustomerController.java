@@ -11,7 +11,8 @@ import entity.queue.WaitingQueue;
 
 /**
  * Handles customer lifecycle management: scheduled arrivals,
- * eating progression, satisfaction decay, and abandonment (Single Responsibility Principle).
+ * Happy Hour satisfaction recovery, eating progression, satisfaction decay,
+ * and abandonment (Single Responsibility Principle).
  */
 public class CustomerController {
     private final String[] predefinedNames = { "Alice", "Bob", "Charlie", "David", "Edward", "Faith" };
@@ -51,6 +52,43 @@ public class CustomerController {
             return newCustomer;
         }
         return null;
+    }
+
+    /**
+     * Executes Happy Hour turn-start satisfaction recovery (Section 4.3).
+     * Customers still waiting for a table (in queue) or waiting for food (seated, unserved)
+     * recover 15 satisfaction (maximum 100).
+     *
+     * @param waitingQueue Queue of waiting customers.
+     * @param tables       Seated customer tables.
+     */
+    public void processHappyHourRecovery(WaitingQueue waitingQueue, Table[] tables) {
+        // 1. Customers waiting in queue for a table
+        for (int i = 0; i < waitingQueue.size(); i++) {
+            Customer c = waitingQueue.get(i);
+            int oldSat = c.getSatisfaction();
+            if (oldSat < 100) {
+                c.setSatisfaction(Math.min(100, oldSat + 15));
+                System.out.println("[HAPPY HOUR] " + c.getName() + " (" + c.getClass().getSimpleName()
+                        + ") recovered satisfaction in queue (" + oldSat + " -> " + c.getSatisfaction() + ").");
+            }
+        }
+
+        // 2. Seated customers waiting for food (SEATED or ORDERED only)
+        for (int i = 0; i < tables.length; i++) {
+            if (tables[i].isOccupied()) {
+                Customer c = tables[i].getseatedCustomer();
+                if (c.getState() == CustomerState.SEATED || c.getState() == CustomerState.ORDERED) {
+                    int oldSat = c.getSatisfaction();
+                    if (oldSat < 100) {
+                        c.setSatisfaction(Math.min(100, oldSat + 15));
+                        System.out.println("[HAPPY HOUR] " + c.getName() + " (" + c.getClass().getSimpleName()
+                                + ") recovered satisfaction at Table " + tables[i].getTableNumber()
+                                + " (" + oldSat + " -> " + c.getSatisfaction() + ").");
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -109,4 +147,3 @@ public class CustomerController {
         }
     }
 }
-
