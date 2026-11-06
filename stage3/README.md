@@ -44,7 +44,28 @@ Stage 3 completes the final functional tier of the Restaurant Rush turn-based ma
 
 ---
 
-## 3. User Inputs and Expected Results
+## 3. Structural Evolution Within Stage 3 (Why the Architecture Changed After Initial Integration)
+
+Stage 3 was developed iteratively in distinct phases rather than rewriting architecture and gameplay features simultaneously:
+
+1. **Initial Stage 3 Feature Integration (`97fa500`)**: Deliberately preserved Stage 2's existing class layout as closely as possible while integrating `Host`, `ComboMeal`, `HappyHour`, and `Staff`. Keeping structural changes minimal first allowed us to verify order-time price locking, +15 Happy Hour recovery, and 18-turn game balance against a stable baseline.
+2. **Initial Boundary Extraction (`005ea3e`)**: Extracted CLI logic out of the ~390-line `Main.java` into `boundary/RestaurantUI.java`. While this slimmed `Main.java`, auditing the resulting codebase revealed that layering Stage 3's extra role, composite items, and dynamic policy onto Stage 2's structure had introduced concrete OOP design smells.
+3. **Full BCE & SOLID Structural Refactoring (`3d644ac` $\rightarrow$ `269056a` $\rightarrow$ `0374d0a`)**: Restructured `entity/`, `control/`, and `boundary/` to eliminate every remaining design-principle violation while keeping runtime gameplay and CLI behavior 100% identical.
+
+### Summary of Structural Changes & Engineering Rationale
+
+| Area Changed | Initial Stage 3 Structure (`97fa500` / `005ea3e`) | Final Refactored Structure (`0374d0a`) | Design Principle & Reason for Change |
+| :--- | :--- | :--- | :--- |
+| **Boundary Layer (`boundary/`)** | All prompts, menus, `Scanner` validation, and status tables lived in `Main.java` (then a single 377-line `RestaurantUI.java`). | Split into 4 cohesive classes: `InputReader`, `GameStatusView`, `StaffActionMenu`, and lightweight facade `RestaurantUI` (65 lines), wired by `Main.java`. | **SRP & DRY**: Separated token validation, read-only rendering, and interactive menus so no single UI class handles multiple responsibilities; unified 4 repeated table-prompt/cancel blocks into `promptTableSelection()`. |
+| **Cross-Layer Console I/O (`control/`, `entity/`)** | `Host`, `Waiter`, `Chef`, `Cashier`, `StaffController`, `CustomerController`, and `RestaurantController` printed directly via `System.out.println`. | Added immutable `control/ActionResult.java` and structured event lists; **zero** `System.out` or `Scanner` calls exist outside `boundary/`. | **Strict BCE & SRP**: Decoupled domain entities and controllers from terminal I/O so business logic can execute and be tested independently of presentation. |
+| **Seating Staff Hierarchy (`entity/staff/`)** | `Host.seat()` and `Waiter.seat()` (plus `StaffController.hostSeatCustomer()` and `seatCustomer()`) duplicated identical validation and seating transitions; `Staff.actedThisTurn` was `protected`. | Added `abstract class SeatingStaff extends Staff` shared by `Host` and `Waiter`; made `actedThisTurn` `private` with `protected markActed()`; unified controller seating via `seatWithStaff()` and `List<Staff>`. | **DRY, LSP & Encapsulation**: Eliminated 100% duplicated seating code introduced by adding the `Host` role and prevented subclasses/packages from mutating turn flags directly. |
+| **Customer Hierarchy (`entity/customer/`)** | `Customer` was concrete; food choices checked hardcoded strings (`"Alice"`, `"David"`, `"Edward"`); UI/controllers used `getClass().getSimpleName()` reflection and computed `Math.min(100, sat + 15)` externally. | Made `Customer` `abstract` with polymorphic `getCustomerType()`, arrival-index deterministic `chooseMenuChoice()`, and `recoverSatisfaction(int)`. | **Polymorphism & Information Expert**: Removed reflection and brittle customer-name coupling while keeping Happy Hour eligibility and cap rules inside `Customer`. |
+| **Composite Menu Guard (`entity/`)** | `ComboMeal` checked only for `null`, allowing invalid nested combos (`ComboMeal` inside `ComboMeal`), and `Menu.getItems()` exposed a raw `MenuItem[]` array. | Added polymorphic `MenuItem.canBeComboComponent()` overridden to `false` in `ComboMeal`; `Menu.getItems()` returns an unmodifiable `List<MenuItem>`. | **OCP, LSP & Encapsulation**: Enforced Section 4.3's two-base-item combo rule polymorphically without `instanceof` and prevented external mutation of the menu catalog. |
+| **Table, Order & Victory Rules (`entity/`, `control/`)** | `RestaurantUI` chained `table.getseatedCustomer().getOrder().isReady()`, hardcoded a 2-table `if/else` Chef menu, and recomputed victory using `double >= 45.0`; `Order`/`Table` exposed raw state setters. | Added `Table.hasCookableOrder()`, `Table.getActiveOrder()`, and `RestaurantController.getCookableTables()` for dynamic $N$-table Chef menus; checked `totalRevenueCents >= 4500` in `GameScoreManager`; removed raw state setters. | **Law of Demeter, OCP & Section 2.2 Rules**: Eliminated object-graph train wrecks, kept win/loss rules and integer-cent money comparisons strictly out of the UI, and protected entity invariants. |
+
+---
+
+## 4. User Inputs and Expected Results
 
 ### 1. Happy Hour Prompt (Turn Start)
 - Shown once per game until activated:
@@ -70,7 +91,7 @@ Stage 3 completes the final functional tier of the Restaurant Rush turn-based ma
 
 ---
 
-## 4. Build & Execution
+## 5. Build & Execution
 
 To compile and run Stage 3 from the `stage3/` directory:
 
@@ -90,7 +111,7 @@ Or execute the automated batch file:
 
 ---
 
-## 5. Reproducible Test Runs (Section 4.1 & 7 Grading Evidence)
+## 6. Reproducible Test Runs (Section 4.1 & 7 Grading Evidence)
 
 ### A. Reproducible Victory Run (Passed All 3 Criteria)
 
