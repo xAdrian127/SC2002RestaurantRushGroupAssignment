@@ -2,47 +2,45 @@
 
 ## 1. Overview
 
-Stage 3 completes the final functional tier of the Restaurant Rush turn-based management game by introducing the **Host** staff role, **ComboMeal** composition, and the **Happy Hour** dynamic pricing policy, fulfilling the requirements of **Section 4.3** of the assignment brief:
+Stage 3 completes the final functional tier of the Restaurant Rush turn-based management game by introducing the **Host** staff role, **ComboMeal** composition, and the **Happy Hour** dynamic pricing policy, fulfilling the requirements of **Section 4.3** of the assignment brief while upholding strict OOP and BCE design principles:
 
-- **Host (`Host.java`)**: Seats at most one queued customer per turn at an available table in addition to the Waiter's action. The Waiter retains the ability to seat customers. This allows concurrent seating and order taking or serving in a single turn.
-- **ComboMeal (`ComboMeal.java`)**: A composite menu item composed of two base menu items (Composite Pattern / Composition). Preparation units equal the sum of both components. The price is calculated as 90% of the combined component price, rounded to the nearest integer cent.
+- **Host (`Host.java` & `SeatingStaff.java`)**: Seats at most one queued customer per turn at an available table in addition to the Waiter's action. Both `Host` and `Waiter` inherit shared seating behavior from `abstract class SeatingStaff` (eliminating duplicate seating logic while upholding LSP).
+- **ComboMeal (`ComboMeal.java`)**: A composite menu item composed of two individual base menu items (Composite Pattern / Composition). Polymorphically rejects nested combo meals via `MenuItem.canBeComboComponent()`. Preparation units equal the sum of both components, and price is 90% of the combined component price rounded to the nearest integer cent.
   - Choice 4: **Salad + Pasta Combo** — $24.30 (900 + 1800 = 2700 * 0.90), 3 preparation units (Section 4.3 example).
   - Choice 5: **Burger + Pasta Combo** — $29.70 (1500 + 1800 = 3300 * 0.90), 3 preparation units.
-- **Documented Customer Food Preferences**:
-  - `RegularCustomer` Alice chooses Burger ($15.00, 1 prep); David chooses **ComboMeal** (Salad + Pasta Combo, $24.30, 3 prep).
-  - `VIPCustomer` Bob chooses Burger ($13.50 VIP, or $10.80 during Happy Hour); Edward chooses **ComboMeal** (Burger + Pasta Combo, $26.73 VIP, 3 prep).
-  - `CriticCustomer` Charlie and Faith choose Pasta ($18.00, 2 prep).
+- **Documented Deterministic Customer Food Preferences (`abstract class Customer`)**:
+  - `RegularCustomer`: Odd arrival sequence (#1 Alice) orders Burger ($15.00, 1 prep); even arrival sequence (#4 David) orders **ComboMeal** (Salad + Pasta Combo, $24.30, 3 prep).
+  - `VIPCustomer`: Early-game VIP (#2 Bob, arrival <= 3) orders Burger ($13.50 VIP, or $10.80 during Happy Hour); late-game VIP (#5 Edward, arrival > 3) orders **ComboMeal** (Burger + Pasta Combo, $26.73 VIP, 3 prep).
+  - `CriticCustomer`: Always orders Pasta ($18.00, 2 prep).
 - **Happy Hour Policy (`HappyHour.java`)**: A dynamic pricing policy the manager can switch on once per game at the start of a turn.
-  - Duration: Active for the activation turn and the next turn (2 turns total). The remaining duration is displayed in the turn header.
-  - **Price Locking**: Orders taken while active receive a 20% discount on their bill, locked into the order at order placement time. For VIP customers, the 10% VIP discount is applied first, followed by the 20% Happy Hour discount ($15.00 * 0.90 * 0.80 = $10.80, Section 4.3 example). Orders placed before Happy Hour remain unaffected.
-  - **Satisfaction Recovery**: During each active turn, customers still waiting for a table (in queue) or waiting for food (seated, unserved) recover 15 satisfaction at turn start (capped at 100). Customers already eating or ready to pay do not recover satisfaction.
+  - Duration: Active for the activation turn and the next turn (2 turns total). Remaining duration is displayed in the turn header.
+  - **Price Locking**: Orders taken while active receive a 20% discount on their bill, locked into `Order.lockedPriceCents` at order placement time. For VIP customers, the 10% VIP discount is applied first using integer cent arithmetic, followed by the 20% Happy Hour discount ($15.00 * 0.90 * 0.80 = $10.80, Section 4.3 example). Orders placed before Happy Hour remain unaffected.
+  - **Satisfaction Recovery**: During each active turn, customers still waiting for a table (`QUEUED`) or waiting for food (`SEATED` or `ORDERED`) recover 15 satisfaction at turn start via `Customer.recoverSatisfaction(int)` (capped at 100). Customers already eating or ready to pay do not recover satisfaction.
 
 ---
 
 ## 2. Key Architectural Improvements over Stage 2 (Design Reflection)
 
-### A. Generalization & Staff Hierarchy (`abstract class Staff`)
-- **Stage 2 Limitation**: In Stage 2, `Waiter`, `Chef`, and `Cashier` each redundantly duplicated the exact same turn-tracking attributes and methods (`actedThisTurn`, `hasActed()`, `resetTurn()`, `waitTurn()`).
-- **Stage 3 Refactoring**: Extracted an `abstract class Staff` in `entity/staff/`. All staff roles (`Waiter`, `Chef`, `Cashier`, `Host`) now inherit from `Staff`. This strictly enforces the **Liskov Substitution Principle (LSP)**, eliminates code duplication (**DRY**), and demonstrates clear generalization/specialization for the UML Class Diagram.
+### A. Generalization & Polymorphic Hierarchies (`Staff` / `SeatingStaff` & `Customer`)
+- **Staff Hierarchy**: `abstract class Staff` encapsulates `private boolean actedThisTurn` and turn quota operations; `abstract class SeatingStaff extends Staff` centralizes seating validation and state transitions shared by `Host` and `Waiter`. `StaffController` resets all staff polymorphically via `List<Staff>`.
+- **Customer Hierarchy**: `Customer` is an `abstract` base class declaring `getSatisfactionLossPerTurn()`, `getCustomerType()`, and `chooseMenuChoice()`, eliminating runtime reflection (`getClass().getSimpleName()`) and string-literal name checks.
 
-### B. Composite Menu Design (Open-Closed Principle - OCP)
-- **Stage 2 Limitation**: Only static atomic menu items existed.
-- **Stage 3 Refactoring**: `ComboMeal` extends `MenuItem` while holding references to two component `MenuItem` objects (**Composite Pattern**). Because `ComboMeal` *is-a* `MenuItem`, the kitchen (`Chef`), order system (`Order`), and Waiter interact with combo meals polymorphically without requiring special-case `instanceof ComboMeal` branches in the controllers.
+### B. Composite Menu Design (Open-Closed Principle - OCP & LSP)
+- `ComboMeal` extends `MenuItem` while holding two component `MenuItem` objects (**Composite Pattern**). Because `ComboMeal` *is-a* `MenuItem`, `Order`, `Waiter`, and `Chef` handle combo meals polymorphically with zero `instanceof` checks, while `canBeComboComponent()` prevents invalid nested combos.
 
-### C. Information Expert & Order-Time Price Locking
-- **Stage 2 Limitation**: In early designs, bill discounts were calculated on the fly at payment time. In Stage 3, dynamic policies (Happy Hour) and expiration mean that computing prices at checkout would erroneously discount orders placed prior to Happy Hour or forfeit discounts for orders placed during Happy Hour that pay after it ends.
-- **Stage 3 Refactoring**: Adhering to the **Information Expert** pattern, `Customer.computeOrderBillCents(item, isHappyHourActive)` computes the final bill upon order taking. The price is locked inside `Order.lockedPriceCents` when the order is created. When the Cashier processes payment turns later, `calculateBillCents()` reads the immutable locked price.
+### C. Information Expert & Encapsulation
+- `Customer.computeOrderBillCents(item, isHappyHourActive)` computes and locks bills in integer cents at order creation time, and `Customer.recoverSatisfaction(points)` encapsulates Happy Hour eligibility and saturation rules.
+- `GameScoreManager` evaluates all win/loss targets using integer cents (`totalRevenueCents >= 4500`).
+- `Menu.getItems()` and `RestaurantController.getTables()` expose unmodifiable `List` views rather than raw mutable arrays, and `Order` / `Table` / `Customer` protect their internal invariants without raw state-corrupting setters.
 
-### D. Preserving Controller Decomposition (Single Responsibility Principle - SRP)
-- Rather than bloating `RestaurantController` into a God class with Stage 3 features:
-  - **`StaffController`**: Takes responsibility for coordinating the new `Host` role alongside `Waiter`, `Chef`, and `Cashier`, enforcing turn quotas.
-  - **`CustomerController`**: Takes responsibility for the Happy Hour satisfaction recovery (+15) across eligible customer states (`QUEUED`, `SEATED`, `ORDERED`).
-  - **`RestaurantController`**: Acts as a lightweight Facade orchestrating high-level turn steps and managing the `HappyHour` policy lifecycle.
-
-### E. Boundary-Control-Entity (BCE) Decoupling
-- Presentation formatting, menu rendering, table status visualization, input validation, and user action collection are completely encapsulated inside `boundary/RestaurantUI.java` (Boundary Layer).
-- `Main.java` is reduced to a concise application entrypoint that cleanly coordinates `RestaurantUI` and `RestaurantController` without directly containing any raw `System.out.println` or input scanning logic.
-- Domain rules (discount calculations, satisfaction boost capping, queue operations) remain strictly encapsulated inside `entity/` and `control/`.
+### D. Strict Boundary-Control-Entity (BCE) & SRP Boundary Decomposition
+- **Entity (`entity/`)** and **Control (`control/`)** contain **zero** `System.out` or `Scanner` calls. Controllers return structured immutable `ActionResult` objects and event lists.
+- **Boundary (`boundary/`)** is decomposed by the **Single Responsibility Principle** to mirror the `control/` layer:
+  - `InputReader`: Encapsulates `Scanner` lifecycle, EOF detection, and numeric token validation.
+  - `GameStatusView`: Handles read-only CLI rendering (banners, turn headers, event logs, table/queue state, and scoreboards), querying victory status from `RestaurantController`.
+  - `StaffActionMenu`: Handles interactive manager command menus (Happy Hour, Host, Waiter, Chef), dynamically scaling Chef menus via `getCookableTables()` and sharing a single table-selection helper (DRY).
+  - `RestaurantUI`: Lightweight Boundary Facade coordinating `InputReader`, `GameStatusView`, and `StaffActionMenu`.
+- **Entrypoint (`Main.java`)** cleanly wires `RestaurantController` and `RestaurantUI`.
 
 ---
 
