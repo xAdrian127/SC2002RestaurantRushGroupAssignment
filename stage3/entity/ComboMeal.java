@@ -17,8 +17,7 @@ public class ComboMeal extends MenuItem {
                 validateItem(firstItem, "firstItem").getName() + " + "
                         + validateItem(secondItem, "secondItem").getName() + " Combo",
                 calculatePrice(firstItem, secondItem),
-                firstItem.getPreparationUnits() + secondItem.getPreparationUnits()
-        );
+                firstItem.getPreparationUnits() + secondItem.getPreparationUnits());
         this.firstItem = firstItem;
         this.secondItem = secondItem;
     }

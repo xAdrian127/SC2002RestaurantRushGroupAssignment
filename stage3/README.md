@@ -40,8 +40,9 @@ Stage 3 completes the final functional tier of the Restaurant Rush turn-based ma
   - **`RestaurantController`**: Acts as a lightweight Facade orchestrating high-level turn steps and managing the `HappyHour` policy lifecycle.
 
 ### E. Boundary-Control-Entity (BCE) Decoupling
-- Input prompts for activating Happy Hour and Host seating actions remain strictly inside `Main.java` (Boundary Layer).
-- Domain rules (discount calculations, satisfaction boost capping, queue operations) remain encapsulated inside `entity/` and `control/`.
+- Presentation formatting, menu rendering, table status visualization, input validation, and user action collection are completely encapsulated inside `boundary/RestaurantUI.java` (Boundary Layer).
+- `Main.java` is reduced to a concise application entrypoint that cleanly coordinates `RestaurantUI` and `RestaurantController` without directly containing any raw `System.out.println` or input scanning logic.
+- Domain rules (discount calculations, satisfaction boost capping, queue operations) remain strictly encapsulated inside `entity/` and `control/`.
 
 ---
 
@@ -77,7 +78,7 @@ To compile and run Stage 3 from the `stage3/` directory:
 
 ```bash
 # Compile all packages and source files
-javac Main.java control/*.java entity/*.java entity/customer/*.java entity/staff/*.java entity/queue/*.java
+javac Main.java boundary/*.java control/*.java entity/*.java entity/customer/*.java entity/staff/*.java entity/queue/*.java
 
 # Run the game
 java Main
